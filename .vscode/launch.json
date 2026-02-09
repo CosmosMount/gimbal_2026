@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "STM32 Debug (DAP)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/wbr_gimbal.elf",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/stm32h7x.cfg"
+            ],
+            "runToEntryPoint": "main",
+            "device": "STM32H723VGTx",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 20
+            },
+            // "svdFile": "${workspaceFolder}/STM32H7.svd"
+        },
+
+        {
+            "name": "STM32 Debug (STLink)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/wbr_gimbal.elf",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32h7x.cfg"
+            ],
+            "runToEntryPoint": "main",
+            "device": "STM32H723VGTx",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 20
+            },
+            // "svdFile": "${workspaceFolder}/STM32H7.svd"
+        },
+
+    ]
+}

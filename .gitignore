@@ -1,0 +1,5 @@
+.idea/
+build/
+*slprj/
+.vscode/settings.json
+.settings/
