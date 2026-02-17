@@ -138,15 +138,12 @@ struct msg_odometry_t
 
 struct msg_cmd_t
 {
-    float x;
-    float v;
-    float w;
     float dyaw;
-    float dlen;
-    float roll;
-    bool move;
-    bool ifjump;
-    bool ifflip;
+    float dpitch;
+    float vx;
+    float vy;
+    bool fire;
+    bool auto_aim;
 };
 
 struct msg_visionrx_t
