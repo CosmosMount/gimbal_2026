@@ -41,9 +41,25 @@ uint8_t ControlThreadStack[2048] = {0};
     constexpr float Yaw_Inertia = 0.00005f;
     constexpr float Pitch_Inertia = 0.00002f;
 
+    constexpr float BulletFreq[10][3] = {
+        {3.5*0.78f, 4*0.78f, 5*0.78f},
+        {4*0.78f, 4.5*0.78f, 7*0.78f},
+        {4.5*0.78f, 5.5*0.78f, 8*0.78f},
+        {5*0.78f, 6.0*0.78f, 12*0.78f}, 
+        {5.5*0.78f, 6.5*0.78f, 13*0.78f}, 
+        {6*0.78f, 7*0.78f, 15*0.78f},
+        {6.5*0.78f, 9*0.78f, 16*0.78f},
+        {7*0.78f, 9.5*0.78f, 16*0.78f},
+        {7.5*0.78f, 10*0.78f, 16*0.78f},
+        {7.5*0.78f, 11*0.78f, 16}
+    };
+
     DJIMotorHandler::Instance()->registerMotor(&Jpitch, &hfdcan1, 0x205);
     DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x201);
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x202);
+
+    om_topic_t *motor_topic = om_config_topic(nullptr, "ca", "motor", sizeof(msg_motor_t));
+    msg_motor_t motor{};
 
     om_suber_t *ins_suber = om_subscribe(om_find_topic("ins", UINT32_MAX));
     msg_ins_t ins{};
@@ -54,18 +70,18 @@ uint8_t ControlThreadStack[2048] = {0};
     memset(&prev_vision_rx, 0, sizeof(msg_visionrx_t));
     om_suber_t *cmd_suber = om_subscribe(om_find_topic("cmd", UINT32_MAX));
     msg_cmd_t cmd{};
+    om_suber_t *comm_suber = om_subscribe(om_find_topic("comm", UINT32_MAX));
+    msg_comm_t comm{};
 
     gimbal_state_e gimbal_state = RELAX;
     shooter_state_e shooter_state = CLOSED;
-
-    uint16_t yaw_current;
-    uint16_t trigger_spd;
 
     for (;;) 
     {
         om_suber_export(ins_suber, &ins, false);
         om_suber_export(vision_suber, &vision_rx, false);
         om_suber_export(cmd_suber, &cmd, false);
+        om_suber_export(comm_suber, &comm, false);
 
         if (Verify_CRC16_Check_Sum(reinterpret_cast<uint8_t*>(&vision_rx), sizeof(msg_visionrx_t)))
         {
@@ -85,7 +101,7 @@ uint8_t ControlThreadStack[2048] = {0};
         switch (gimbal_state) 
         {
         case RELAX:
-            yaw_current = 0;
+            motor.yaw_cur = 0;
             Jpitch.currentSet = 0;
             break;
 
@@ -107,7 +123,7 @@ uint8_t ControlThreadStack[2048] = {0};
             yaw_mit.vel_fdb = ins.gyro_y;
             pitch_mit.pos_fdb = ins.pitch;
             pitch_mit.vel_fdb = ins.gyro_p;
-            yaw_current = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
+            motor.yaw_cur = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
             Jpitch.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
             break;
 
@@ -121,7 +137,7 @@ uint8_t ControlThreadStack[2048] = {0};
             yaw_mit.vel_fdb = ins.gyro_y;
             pitch_mit.pos_fdb = ins.pitch;
             pitch_mit.vel_fdb = ins.gyro_p;
-            yaw_current = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
+            motor.yaw_cur = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
             Jpitch.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
 
             if (cmd.auto_aim)
@@ -137,44 +153,53 @@ uint8_t ControlThreadStack[2048] = {0};
         case CLOSED:
             Lfric.currentSet = 0;
             Rfric.currentSet = 0;
-            trigger_spd = 0;
+            motor.tri_spd = 0;
             break;
         
         case WARM:
             Lfric.speedSet = -660;
             Rfric.speedSet = 660;
-            trigger_spd = 0;
+            motor.tri_spd = 0;
             break;
 
-        case MANUAL:
-            Lfric.speedSet = -660;
-            Rfric.speedSet = 660;
-            if (cmd.fire)
-            {
-                trigger_spd = 150;
-            }
-            else
-            {
-                trigger_spd = 0;
-            }
-            break;
-        
-        case AUTO:
+        case FIRE:
             Lfric.speedSet = -660;
             Rfric.speedSet = 660;
             if (((yaw_mit.pos_ref-yaw_mit.pos_fdb)<0.01f 
                 && (pitch_mit.pos_ref-pitch_mit.pos_fdb)<0.002f 
-                && vision_rx.fire))
+                && vision_rx.fire)
+                || cmd.fire)
             {
-                trigger_spd = 150;
+                switch (cmd.shooter_type)
+                {
+                case SINGLE:
+                    motor.tri_spd = 6;
+                    break;
+                case NORMAL:
+                    motor.tri_spd = BulletFreq[comm.level-1][1];
+                    if (comm.heat_now >= comm.heat_limit*0.75f)
+                        motor.tri_spd = BulletFreq[comm.level-1][0];
+                    if (comm.heat_now >= comm.heat_limit*0.85f)
+                        motor.tri_spd = 0;
+                    break;
+                case BURST:
+                    motor.tri_spd = BulletFreq[comm.level-1][2];
+                    if (comm.heat_now >= comm.heat_limit*0.75f)
+                        motor.tri_spd = BulletFreq[comm.level-1][0];
+                    if (comm.heat_now >= comm.heat_limit*0.85f)
+                        motor.tri_spd = 0;
+                    break;
+                }
             }
             else
             {
-                trigger_spd = 0;
+                motor.tri_spd = 0;
             }
+            break;
         }
         Lfric.setOutput();
         Rfric.setOutput();
+        om_publish(motor_topic, &motor, sizeof(msg_motor_t), true, false);
         tx_thread_sleep(1);
     }
 }

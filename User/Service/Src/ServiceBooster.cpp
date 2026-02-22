@@ -27,10 +27,6 @@ extern TX_THREAD IMUTempThread;
 extern uint8_t IMUTempThreadStack[1024];
 extern void IMUTempThreadFun(ULONG initial_input);
 
-extern TX_THREAD RefereeThread;
-extern uint8_t RefereeThreadStack[2048];
-extern void RefereeThreadFun(ULONG initial_input);
-
 /*EKF pool*/
 TX_BYTE_POOL KFPool;
 UCHAR KF_PoolBuf[4096] = {0};
@@ -110,8 +106,4 @@ extern "C" void ServiceBooster()
     tx_thread_create(&IMUTempThread, TX_NAME("IMUTempThread"),
         IMUTempThreadFun, 0x1234, IMUTempThreadStack, sizeof(IMUTempThreadStack),
         4, 4, TX_NO_TIME_SLICE, TX_AUTO_START);
-
-    tx_thread_create(&RefereeThread, TX_NAME("RefereeThread"),
-        RefereeThreadFun, 0x1234, RefereeThreadStack, sizeof(RefereeThreadStack),
-        8, 8, TX_NO_TIME_SLICE, TX_AUTO_START);
 }

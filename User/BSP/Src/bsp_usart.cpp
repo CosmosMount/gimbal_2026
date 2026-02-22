@@ -1,7 +1,6 @@
 #include "bsp_usart.hpp"
 #include "XRobot.hpp"
 #include "config_remoter.hpp"
-#include "config_referee.hpp"
 #include "tx_api.h"
 #include "usart.h"
 
@@ -20,7 +19,6 @@ __attribute__((section (".RAM_D1"))) uint8_t UART7RxBuffer[256] = {0};
 __attribute__((section (".RAM_D1"))) uint8_t USART1RxBuffer[256] = {0};
 extern uint8_t dr16_rx[DR16_DATA_SIZE];
 extern TX_SEMAPHORE RemoterGot;
-extern RefereeRingBuffer referee_fifo;
 
 /**
  * @brief  Configures the USART.
@@ -65,8 +63,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   }
   else if (huart == &huart1) 
   {
-    SCB_InvalidateDCache_by_Addr((uint32_t*)USART1RxBuffer, 256);
-    referee_fifo.push(USART1RxBuffer, Size);
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, USART1RxBuffer, 256);
+    // SCB_InvalidateDCache_by_Addr((uint32_t*)USART1RxBuffer, 256);
+    // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, USART1RxBuffer, 256);
   }
 }

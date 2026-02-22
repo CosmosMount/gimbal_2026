@@ -1,14 +1,9 @@
 class MIT
 {
 protected:
-    float lower_limit = -1000.0f;
-    float upper_limit = 1000.0f;
+    float lower_limit;
+    float upper_limit;
 public:
-    MIT(float _kp, float _kd, float _lowerlimit, float _upperlimit) : kp(_kp), kd(_kd), lower_limit(_lowerlimit), upper_limit(_upperlimit)
-    {
-    }
-    ~MIT() = default;
-
     float pos_ref;
     float pos_fdb;
     float vel_ref;
@@ -16,6 +11,12 @@ public:
     float kp;
     float kd;
     float torque;
+
+    MIT(float _kp, float _kd, float _lowerlimit, float _upperlimit) 
+        : kp(_kp), kd(_kd), lower_limit(_lowerlimit), upper_limit(_upperlimit)
+    {
+    }
+    ~MIT() = default;
 
     float Update()
     {

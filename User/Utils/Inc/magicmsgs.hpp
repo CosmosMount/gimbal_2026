@@ -136,16 +136,6 @@ struct msg_odometry_t
     float a_z;
 };
 
-struct msg_cmd_t
-{
-    float dyaw;
-    float dpitch;
-    float vx;
-    float vy;
-    bool fire;
-    bool auto_aim;
-};
-
 struct msg_visionrx_t
 {
     uint8_t header;       // 发送数据包的头
