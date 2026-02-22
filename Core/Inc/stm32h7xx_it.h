@@ -60,7 +60,7 @@ void DMA1_Stream4_IRQHandler(void);
 void DMA1_Stream5_IRQHandler(void);
 void FDCAN1_IT0_IRQHandler(void);
 void FDCAN2_IT0_IRQHandler(void);
-void TIM2_IRQHandler(void);
+void FDCAN1_IT1_IRQHandler(void);
 void SPI2_IRQHandler(void);
 void USART1_IRQHandler(void);
 void UART5_IRQHandler(void);
