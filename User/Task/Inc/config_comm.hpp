@@ -27,7 +27,8 @@ struct comm_cmd_t
     uint8_t ifspin : 1;
     uint8_t ifturn : 1;
     uint16_t yaw_cur : 16;
-    float v;
+    float vx;
+    float vy;
     float dlen;
     float tri_spd;
 };

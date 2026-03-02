@@ -11,7 +11,7 @@
             "-f",
             "target/stm32h7x.cfg",
             "-c",
-            "program build/Debug/wbr_chassis.elf reset exit"
+            "program build/Debug/wbr_gimbal.elf reset exit"
         ],
         "problemMatcher": []
     }

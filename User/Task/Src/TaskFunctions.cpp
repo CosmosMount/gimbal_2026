@@ -48,8 +48,9 @@ extern uint8_t CommMsg[8];
             cmd.ifmove = true;
         else
             cmd.ifmove = false;
-        cmd_msg.v = (remoter.key.W ? 1.0f : 0.0f) - (remoter.key.S ? 1.0f : 0.0f);
-        cmd_msg.dlen = (remoter.key.D ? 1.0f : 0.0f) - (remoter.key.A ? 1.0f : 0.0f);
+        cmd_msg.vx = (remoter.key.W ? 1.0f : 0.0f) - (remoter.key.S ? 1.0f : 0.0f);
+        cmd_msg.vy = (remoter.key.D ? 1.0f : 0.0f) - (remoter.key.A ? 1.0f : 0.0f);
+        cmd_msg.dlen = remoter.key.CTRL ? (remoter.key.Q ? 1.0f : 0.0f) - (remoter.key.E ? 1.0f : 0.0f) : 0.0f;
         cmd.dpitch = remoter.mouse_x;
         cmd.dyaw = remoter.mouse_y;
         if (!remoter.last_key.Z && remoter.key.Z)
