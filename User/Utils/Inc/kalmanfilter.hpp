@@ -97,4 +97,53 @@ namespace Filter
         arm_matrix_instance_f32 S, temp_matrix, temp_matrix1, temp_vector, temp_vector1;
         float *S_data, *temp_matrix_data, *temp_matrix_data1, *temp_vector_data, *temp_vector_data1;
     };
+
+    /**
+     * @brief 一阶卡尔曼滤波器
+     * @note 简单的卡尔曼滤波实现，仅作用于一阶简单系统
+     */
+    class KalmanFilter_1D
+    {
+        float LastP;    // 上次估算协方差		--e(ESTk-1)     上次协方差
+        float NowP;     // 当前估算协方差		--预测e(ESTk)	当前估算协方差
+        float result;   // 卡尔曼滤波器输出
+        float Kg;       // 卡尔曼增益		    --Kk
+        float Q;        // 过程噪声协方差
+        float R;        // 观测噪声协方差		--e(MEAk)       测量误差
+    public:
+        /**
+         * @brief 构造函数，简单复制初始化，避免出现未知错误
+         */
+        KalmanFilter_1D();
+
+        /**
+         * @brief 清空卡尔曼滤波器
+         */
+        void Clear();
+
+        /**
+         * @brief 设置卡尔曼滤波器的增益
+         * @param kg 卡尔曼滤波器的增益
+         * @return void
+         */
+        void SetKg(float kg);
+
+        /**
+         * @brief 设置卡尔曼滤波器的过程噪声协方差
+         * @param q 过程噪声协方差
+         */
+        void SetQ(float q);
+
+        /**
+         * @brief 设置卡尔曼滤波器的观测噪声协方差
+         */
+        void SetR(float r);
+
+        /**
+         * @brief 更新卡尔曼滤波器的输出
+         * @param input 卡尔曼滤波器的输入
+         * @return 卡尔曼滤波器的输出
+         */
+        float Update(float input);
+    };
 }

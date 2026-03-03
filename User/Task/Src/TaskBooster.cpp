@@ -2,7 +2,7 @@
 #include "tx_api.h"
 
 extern TX_THREAD ControlThread;
-extern uint8_t ControlThreadStack[2048];
+extern uint8_t ControlThreadStack[4096];
 extern void ControlThreadFun(ULONG initial_input);
 
 extern TX_THREAD OperateThread;

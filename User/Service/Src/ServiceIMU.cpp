@@ -72,17 +72,28 @@ TX_SEMAPHORE IMUThreadSem;
         tx_semaphore_put(&IMUThreadSem);
         tx_semaphore_put(&IMUThreadSem);
 
-        memcpy(msg_ins.quaternion, qekf.q, sizeof(qekf.q));
         msg_ins.yaw = qekf.yaw;
-        msg_ins.pitch = qekf.pitch;
-        msg_ins.roll = qekf.roll;
+        msg_ins.pitch = qekf.roll;
+        msg_ins.roll = -qekf.pitch;
         msg_ins.total_yaw = qekf.total_yaw;
-        msg_ins.gyro_r = imu_handler->gyro_data.x;
-        msg_ins.gyro_p = imu_handler->gyro_data.y;
+        msg_ins.gyro_r = -imu_handler->gyro_data.y;
+        msg_ins.gyro_p = imu_handler->gyro_data.x;
         msg_ins.gyro_y = imu_handler->gyro_data.z;
         msg_ins.accel[0] = imu_handler->acc_data.x;
         msg_ins.accel[1] = imu_handler->acc_data.y;
         msg_ins.accel[2] = imu_handler->acc_data.z;
+
+        float cy = arm_cos_f32(msg_ins.yaw*DegreeToRad*0.5f);
+        float sy = arm_sin_f32(msg_ins.yaw*DegreeToRad*0.5f);
+        float cp = arm_cos_f32(msg_ins.pitch*DegreeToRad*0.5f);
+        float sp = arm_sin_f32(msg_ins.pitch*DegreeToRad*0.5f);
+        float cr = arm_cos_f32(msg_ins.roll*DegreeToRad*0.5f);
+        float sr = arm_sin_f32(msg_ins.roll*DegreeToRad*0.5f);
+        // quaternion x,y,z,w
+        msg_ins.quaternion[0] = sr * cp * cy - cr * sp * sy;
+        msg_ins.quaternion[1] = cr * sp * cy + sr * cp * sy;
+        msg_ins.quaternion[2] = cr * cp * sy - sr * sp * cy;
+        msg_ins.quaternion[3] = cr * cp * cy + sr * sp * sy;
 
         om_publish(ins_topic, &msg_ins, sizeof(msg_ins), true, false);
 

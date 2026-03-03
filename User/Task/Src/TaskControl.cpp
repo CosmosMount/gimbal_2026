@@ -1,7 +1,6 @@
-#include "DJIMotor.hpp"
-#include "DMMotor.hpp"
 #include "fdcan.h"
 #include "main.h"
+
 #include "tx_api.h"
 
 #include "om.h"
@@ -9,6 +8,8 @@
 
 #include "mit.hpp"
 #include "crc.hpp"
+#include "math.hpp"
+#include "kalmanfilter.hpp"
 
 #include "M2006.hpp"
 #include "M3508.hpp"
@@ -16,10 +17,11 @@
 #include "DJIMotorHandler.hpp"
 
 #include "config_gimbal.hpp"
-#include <cstdint>
+
+using namespace Filter;
 
 TX_THREAD ControlThread;
-uint8_t ControlThreadStack[2048] = {0};
+uint8_t ControlThreadStack[4096] = {0};
 extern TX_SEMAPHORE IMUThreadSem;
 
 #ifdef DEBUG
@@ -33,6 +35,23 @@ typedef struct
     float rfric_cur;
 } debug_motor_t;
 debug_motor_t debug_motor;
+typedef struct
+{
+    float kp;
+    float kd;
+} mit_tuning_t;
+mit_tuning_t yaw_mit_tuning = {1.0f, 0.1f};
+mit_tuning_t pitch_mit_tuning = {50.0f, 2.0f};
+struct gimbal_debug_t
+{
+    float pos_set;
+    float pos_fdb;
+    float spd_set;
+    float spd_fdb;
+};
+gimbal_debug_t pitch_debug;
+gimbal_debug_t yaw_debug;
+msg_ins_t debug_ins;
 #endif
 
 [[noreturn]] void ControlThreadFun(ULONG initial_input) 
@@ -42,8 +61,6 @@ debug_motor_t debug_motor;
     GM6020 Jpitch;
     M3508 Lfric;
     M3508 Rfric;
-
-    Jpitch.controlMode = DJIMotor::POS_MODE;
 
     Lfric.controlMode = DJIMotor::SPD_MODE;
     Lfric.gearBox = GearBox_None;
@@ -56,15 +73,10 @@ debug_motor_t debug_motor;
     DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x202);
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x201);
 
-    MIT yaw_mit = MIT(1.0f, 0.1f, -1.2, 1.2);
-    MIT pitch_mit = MIT(1.0f, 0.1f, -1.2, 1.2);
+    MIT yaw_mit = MIT(1.0f, 0.1f, -50.0f, 50.0f);
+    MIT pitch_mit = MIT(5.0f, 0.1f, -50.0f, 50.0f);
 
-    yaw_mit.kp = 1.0f;
-    yaw_mit.kd = 0.1f;
-    pitch_mit.kp = 1.0f;
-    pitch_mit.kd = 0.1f;
-
-    constexpr float Tk_6020 = 4060.848; // 16384/3A*0.741Nm/A
+    constexpr float Tk_6020 = 5000.0f; // 16384/3A*0.741Nm/A
     constexpr float Yaw_Inertia = 0.00005f;
     constexpr float Pitch_Inertia = 0.00002f;
 
@@ -99,6 +111,12 @@ debug_motor_t debug_motor;
     gimbal_state_e gimbal_state = RELAX;
     shooter_state_e shooter_state = CLOSED;
 
+    KalmanFilter_1D gyro_pitch_filter;
+    gyro_pitch_filter.SetQ(0.0001f);
+    gyro_pitch_filter.SetR(1.0f);
+
+    bool inited = false;
+
     for (;;) 
     {
         om_suber_export(ins_suber, &ins, false);
@@ -127,6 +145,7 @@ debug_motor_t debug_motor;
         switch (gimbal_state) 
         {
         case RELAX:
+            inited  = false;
             motor.yaw_cur = 0;
             Jpitch.currentSet = 0;
             if (cmd.ifmove)
@@ -159,15 +178,26 @@ debug_motor_t debug_motor;
 
         case MANUALAIM:
 
-            yaw_mit.pos_ref = ins.total_yaw+cmd.dyaw*0.001f;
-            yaw_mit.pos_fdb = ins.total_yaw;
+            if (!inited)
+            {
+                yaw_mit.pos_ref = 0.0f;
+                pitch_mit.pos_ref = 0.0f;
+                if (fabs(ins.pitch) < 5.0f)
+                    inited = true;
+            }
+            else 
+            {
+                yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.1f;
+                pitch_mit.pos_ref = ins.pitch*DegreeToRad + cmd.dpitch*0.1f;
+            }
+
+            yaw_mit.pos_fdb = ins.total_yaw*DegreeToRad;
             yaw_mit.vel_ref = ins.gyro_y+cmd.dyaw*0.1f;
             yaw_mit.vel_fdb = ins.gyro_y;
 
-            pitch_mit.pos_ref = ins.pitch+cmd.dpitch*0.001f;
-            pitch_mit.pos_fdb = ins.pitch;
-            pitch_mit.vel_ref = ins.gyro_p+cmd.dpitch*0.1f;
-            pitch_mit.vel_fdb = ins.gyro_p;
+            pitch_mit.pos_fdb = ins.pitch*DegreeToRad;
+            pitch_mit.vel_ref = 0.0f;//cmd.dpitch;
+            pitch_mit.vel_fdb = gyro_pitch_filter.Update(ins.gyro_p);
             pitch_mit.torque = -1.0f;
             
             motor.yaw_cur = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
@@ -237,12 +267,26 @@ debug_motor_t debug_motor;
         DJIMotorHandler::Instance()->sendControlData();
         om_publish(motor_topic, &motor, sizeof(msg_motor_t), true, false);
     #ifdef DEBUG
+        debug_ins = ins;
+        
         debug_motor.pitchmotor_spd = Jpitch.motorFeedback.speedFdb;
         debug_motor.pitchmotor_cur = Jpitch.motorFeedback.currentFdb;
         debug_motor.lfric_spd = Lfric.motorFeedback.speedFdb;
         debug_motor.lfric_cur = Lfric.motorFeedback.currentFdb;
         debug_motor.rfric_spd = Rfric.motorFeedback.speedFdb;
         debug_motor.rfric_cur = Rfric.motorFeedback.currentFdb;
+        yaw_mit.kp = yaw_mit_tuning.kp;
+        yaw_mit.kd = yaw_mit_tuning.kd;
+        pitch_mit.kp = pitch_mit_tuning.kp;
+        pitch_mit.kd = pitch_mit_tuning.kd;
+        yaw_debug.pos_set = yaw_mit.pos_ref;
+        yaw_debug.pos_fdb = ins.total_yaw*DegreeToRad;
+        yaw_debug.spd_set = yaw_mit.vel_ref;
+        yaw_debug.spd_fdb = ins.gyro_y;
+        pitch_debug.pos_set = pitch_mit.pos_ref;
+        pitch_debug.pos_fdb = ins.pitch*DegreeToRad;
+        pitch_debug.spd_set = pitch_mit.vel_ref;
+        pitch_debug.spd_fdb = gyro_pitch_filter.Update(ins.gyro_p);
     #endif
         tx_thread_sleep(1);
     }
