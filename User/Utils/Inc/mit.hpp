@@ -13,7 +13,7 @@ public:
     float torque;
 
     MIT(float _kp, float _kd, float _lowerlimit, float _upperlimit) 
-        : kp(_kp), kd(_kd), lower_limit(_lowerlimit), upper_limit(_upperlimit)
+        : lower_limit(_lowerlimit), upper_limit(_upperlimit), kp(_kp), kd(_kd)
     {
     }
     ~MIT() = default;

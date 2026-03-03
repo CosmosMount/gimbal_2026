@@ -1,7 +1,7 @@
+#include "DJIMotor.hpp"
+#include "DMMotor.hpp"
 #include "fdcan.h"
 #include "main.h"
-#include "om_core.h"
-#include "om_msg.h"
 #include "tx_api.h"
 
 #include "om.h"
@@ -20,6 +20,20 @@
 
 TX_THREAD ControlThread;
 uint8_t ControlThreadStack[2048] = {0};
+extern TX_SEMAPHORE IMUThreadSem;
+
+#ifdef DEBUG
+typedef struct
+{
+    float pitchmotor_spd;
+    float pitchmotor_cur;
+    float lfric_spd;
+    float lfric_cur;
+    float rfric_spd;
+    float rfric_cur;
+} debug_motor_t;
+debug_motor_t debug_motor;
+#endif
 
 [[noreturn]] void ControlThreadFun(ULONG initial_input) 
 {
@@ -28,6 +42,19 @@ uint8_t ControlThreadStack[2048] = {0};
     GM6020 Jpitch;
     M3508 Lfric;
     M3508 Rfric;
+
+    Jpitch.controlMode = DJIMotor::POS_MODE;
+
+    Lfric.controlMode = DJIMotor::SPD_MODE;
+    Lfric.gearBox = GearBox_None;
+    Lfric.speedPid.kp = 100.0f;
+    Rfric.controlMode = DJIMotor::SPD_MODE;
+    Rfric.gearBox = GearBox_None;
+    Rfric.speedPid.kp = 100.0f;
+
+    DJIMotorHandler::Instance()->registerMotor(&Jpitch, &hfdcan1, 0x205);
+    DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x202);
+    DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x201);
 
     MIT yaw_mit = MIT(1.0f, 0.1f, -1.2, 1.2);
     MIT pitch_mit = MIT(1.0f, 0.1f, -1.2, 1.2);
@@ -53,10 +80,6 @@ uint8_t ControlThreadStack[2048] = {0};
         {7.5*0.78f, 10*0.78f, 16*0.78f},
         {7.5*0.78f, 11*0.78f, 16}
     };
-
-    DJIMotorHandler::Instance()->registerMotor(&Jpitch, &hfdcan1, 0x205);
-    DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x201);
-    DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x202);
 
     om_topic_t *motor_topic = om_config_topic(nullptr, "ca", "motor", sizeof(msg_motor_t));
     msg_motor_t motor{};
@@ -97,12 +120,19 @@ uint8_t ControlThreadStack[2048] = {0};
                 memcpy(&prev_vision_rx, &vision_rx, sizeof(msg_visionrx_t));
             }
         }
+
+        if (!cmd.ifmove || tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) != TX_SUCCESS)
+            gimbal_state = RELAX;
         
         switch (gimbal_state) 
         {
         case RELAX:
             motor.yaw_cur = 0;
             Jpitch.currentSet = 0;
+            if (cmd.ifmove)
+            {
+                gimbal_state = MANUALAIM;
+            }
             break;
 
         case AUTOAIM:
@@ -130,13 +160,16 @@ uint8_t ControlThreadStack[2048] = {0};
         case MANUALAIM:
 
             yaw_mit.pos_ref = ins.total_yaw+cmd.dyaw*0.001f;
-            pitch_mit.pos_ref = ins.pitch+cmd.dpitch*0.001f;
-            yaw_mit.vel_ref = ins.gyro_y+cmd.dyaw*0.1f;
-            pitch_mit.vel_ref = ins.gyro_p+cmd.dpitch*0.1f;
             yaw_mit.pos_fdb = ins.total_yaw;
+            yaw_mit.vel_ref = ins.gyro_y+cmd.dyaw*0.1f;
             yaw_mit.vel_fdb = ins.gyro_y;
+
+            pitch_mit.pos_ref = ins.pitch+cmd.dpitch*0.001f;
             pitch_mit.pos_fdb = ins.pitch;
+            pitch_mit.vel_ref = ins.gyro_p+cmd.dpitch*0.1f;
             pitch_mit.vel_fdb = ins.gyro_p;
+            pitch_mit.torque = -1.0f;
+            
             motor.yaw_cur = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
             Jpitch.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
 
@@ -148,21 +181,22 @@ uint8_t ControlThreadStack[2048] = {0};
             break;
         }
 
+        if (!cmd.shoot)
+        {
+            shooter_state = CLOSED;
+        }
+
         switch (shooter_state)
         {
         case CLOSED:
             Lfric.currentSet = 0;
             Rfric.currentSet = 0;
             motor.tri_spd = 0;
-            break;
-        
-        case WARM:
-            Lfric.speedSet = -660;
-            Rfric.speedSet = 660;
-            motor.tri_spd = 0;
+            if (cmd.shoot)
+                shooter_state = SHOOT;
             break;
 
-        case FIRE:
+        case SHOOT:
             Lfric.speedSet = -660;
             Rfric.speedSet = 660;
             if (((yaw_mit.pos_ref-yaw_mit.pos_fdb)<0.01f 
@@ -195,11 +229,21 @@ uint8_t ControlThreadStack[2048] = {0};
             {
                 motor.tri_spd = 0;
             }
+
+            Lfric.setOutput();
+            Rfric.setOutput();
             break;
         }
-        Lfric.setOutput();
-        Rfric.setOutput();
+        DJIMotorHandler::Instance()->sendControlData();
         om_publish(motor_topic, &motor, sizeof(msg_motor_t), true, false);
+    #ifdef DEBUG
+        debug_motor.pitchmotor_spd = Jpitch.motorFeedback.speedFdb;
+        debug_motor.pitchmotor_cur = Jpitch.motorFeedback.currentFdb;
+        debug_motor.lfric_spd = Lfric.motorFeedback.speedFdb;
+        debug_motor.lfric_cur = Lfric.motorFeedback.currentFdb;
+        debug_motor.rfric_spd = Rfric.motorFeedback.speedFdb;
+        debug_motor.rfric_cur = Rfric.motorFeedback.currentFdb;
+    #endif
         tx_thread_sleep(1);
     }
 }

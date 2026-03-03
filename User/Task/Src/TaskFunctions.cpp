@@ -1,7 +1,6 @@
 #include "bsp_can.hpp"
 #include "fdcan.h"
 #include "main.h"
-#include "om_msg.h"
 #include "tx_api.h"
 
 #include "om.h"
@@ -9,6 +8,10 @@
 #include "magicmsgs.hpp"
 #include "config_gimbal.hpp"
 #include "config_comm.hpp"
+
+#ifdef DEBUG
+msg_remoter_t debug_remoter;
+#endif
 
 TX_THREAD OperateThread;
 uint8_t OperateThreadStack[2048] = {0};
@@ -30,8 +33,8 @@ extern uint8_t CommMsg[8];
     om_suber_t *vision_suber = om_subscribe(om_find_topic("visionrx", UINT32_MAX));
     msg_visionrx_t vision_rx{};
 
-    uint8_t UIMsg[8];
-    uint8_t CmdMsg[16];
+    uint8_t UIMsg[UIMSG_SIZE];
+    uint8_t CmdMsg[CMDMSG_SIZE];
 
     comm_ui_t ui_msg;
     comm_cmd_t cmd_msg;
@@ -43,24 +46,28 @@ extern uint8_t CommMsg[8];
         om_suber_export(remoter_suber, &remoter, false);
         om_suber_export(vision_suber, &vision_rx, false);
         om_suber_export(motor_suber, &motor, false);
-    #ifdef KEYBOARD
+
         if (remoter.ctrl_sw == Normal)
             cmd.ifmove = true;
         else
             cmd.ifmove = false;
-        cmd_msg.vx = (remoter.key.W ? 1.0f : 0.0f) - (remoter.key.S ? 1.0f : 0.0f);
-        cmd_msg.vy = (remoter.key.D ? 1.0f : 0.0f) - (remoter.key.A ? 1.0f : 0.0f);
-        cmd_msg.dlen = remoter.key.CTRL ? (remoter.key.Q ? 1.0f : 0.0f) - (remoter.key.E ? 1.0f : 0.0f) : 0.0f;
-        cmd.dpitch = remoter.mouse_x;
-        cmd.dyaw = remoter.mouse_y;
+        cmd_msg.vx = static_cast<int8_t>(((remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f)+remoter.left_y)*10);
+        cmd_msg.vy = static_cast<int8_t>(((remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f)+remoter.left_x)*10);
+        cmd_msg.dlen = static_cast<int8_t>((remoter.key.CTRL ? ((remoter.key.Q ? 1.0f : 0.0f) - (remoter.key.E ? 1.0f : 0.0f)) : 0.0f)*10);
+        cmd.dpitch = remoter.mouse_x + remoter.right_x;
+        cmd.dyaw = remoter.mouse_y + remoter.right_y;
         if (!remoter.last_key.Z && remoter.key.Z)
             cmd.shooter_type = SINGLE;
         if (!remoter.last_key.X && remoter.key.X)
             cmd.shooter_type = NORMAL;
         if (!remoter.last_key.C && remoter.key.C)
             cmd.shooter_type = BURST;
-
-        if (remoter.mouse_left)
+        
+        if (remoter.shoot_sw == Warm || remoter.shoot_sw == Fire)
+            cmd.shoot = true;
+        else
+            cmd.shoot = false;
+        if (remoter.mouse_left || remoter.shoot_sw == Fire)
             cmd.fire = true;
         if (remoter.mouse_right)
             cmd.auto_aim = true;
@@ -76,10 +83,6 @@ extern uint8_t CommMsg[8];
 
         if (!remoter.last_key.E && remoter.key.E)
             cmd.aim_target = (cmd.aim_target + 1) % 10;
-    #else
-        cmd.vx = remoter.left_y;
-        cmd.vy = remoter.left_x;
-    #endif
 
         ui_msg.reset = ui_reset;
         ui_msg.aim_target_x = static_cast<uint8_t>(vision_rx.project_x);
@@ -96,13 +99,16 @@ extern uint8_t CommMsg[8];
         memcpy(&UIMsg, reinterpret_cast<uint8_t*>(&ui_msg), sizeof(comm_ui_t));
         memcpy(&CmdMsg, reinterpret_cast<uint8_t*>(&cmd_msg), sizeof(comm_cmd_t));
 
-        FDCAN_Transmit(&hfdcan3, 0xB1, UIMsg, 8);
-        FDCAN_Transmit(&hfdcan3, 0xB2, CmdMsg, 16);
+        FDCAN_Transmit(&hfdcan2, 0xB1, UIMsg, UIMSG_SIZE);
+        FDCAN_Transmit(&hfdcan2, 0xB2, CmdMsg, CMDMSG_SIZE);
 
         comm = *reinterpret_cast<comm_chassis_t*>(CommMsg);
 
         om_publish(cmd_topic, &cmd, sizeof(msg_cmd_t), true, false);
         om_publish(comm_topic, &comm, sizeof(comm_chassis_t), true, false);
+    #ifdef DEBUG
+        debug_remoter = remoter;
+    #endif
         tx_thread_sleep(1);
     }
 }

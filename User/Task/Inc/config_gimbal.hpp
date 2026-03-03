@@ -1,6 +1,9 @@
 #pragma once
 
-#define KEYBOARD
+#ifndef DEBUG
+#define DEBUG
+#endif
+// #define KEYBOARD
 
 typedef enum
 {
@@ -12,8 +15,7 @@ typedef enum
 typedef enum
 {
     CLOSED,
-    WARM,
-    FIRE
+    SHOOT
 } shooter_state_e;
 
 typedef enum
@@ -31,6 +33,7 @@ struct msg_cmd_t
     bool ifmove;
     bool ifjump;
     bool ifspin;
+    bool shoot;
     bool fire;
     bool auto_aim;
     shooter_type_e shooter_type;

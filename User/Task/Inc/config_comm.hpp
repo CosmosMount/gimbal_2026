@@ -27,10 +27,13 @@ struct comm_cmd_t
     uint8_t ifspin : 1;
     uint8_t ifturn : 1;
     uint16_t yaw_cur : 16;
-    float vx;
-    float vy;
-    float dlen;
-    float tri_spd;
+    int8_t vx;
+    int8_t vy;
+    int8_t dlen;
+    int8_t tri_spd;
 };
+
+#define UIMSG_SIZE sizeof(comm_ui_t)
+#define CMDMSG_SIZE sizeof(comm_cmd_t)
 
 #pragma pack(pop)
