@@ -71,7 +71,7 @@ public:
      */
     void updateFeedback(FDCAN_HandleTypeDef *hfdcan, uint8_t *rx_data, int index);
 
-    void AllMotorAliveCheck();
+    bool AllMotorAlive();
 
     void AllMotorBlockedCheck();
 

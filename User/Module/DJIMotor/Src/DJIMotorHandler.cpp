@@ -228,7 +228,7 @@ void DJIMotorHandler::UpdateSensorData(DJIMotor *motor, uint8_t *can_data)
  * @brief 检查所有列表中存在的电机是否在线
  * @note 需要在主循环中调用
  */
-void DJIMotorHandler::AllMotorAliveCheck()
+bool DJIMotorHandler::AllMotorAlive()
 {
     for (uint8_t i = 0; i < 2; i++)
     {
@@ -236,10 +236,14 @@ void DJIMotorHandler::AllMotorAliveCheck()
         {
             if (DJIMotorList[i][j] != nullptr)
             {
-                DJIMotorList[i][j]->AliveCheck();
+                if (DJIMotorList[i][j]->AliveCheck() == DJIMotor::MOTOR_OFFLINE)
+                {
+                    return false; // 只要有一个电机离线，就返回false
+                }
             }
         }
     }
+    return true;
 }
 
 /**

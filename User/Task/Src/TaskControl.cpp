@@ -1,3 +1,5 @@
+#include "bsp_dwt.hpp"
+#include "fast_math_functions.h"
 #include "fdcan.h"
 #include "main.h"
 
@@ -39,9 +41,10 @@ typedef struct
 {
     float kp;
     float kd;
+    float tcomp;
 } mit_tuning_t;
-mit_tuning_t yaw_mit_tuning = {1.0f, 0.1f};
-mit_tuning_t pitch_mit_tuning = {50.0f, 2.0f};
+mit_tuning_t yaw_mit_tuning = {5.0f, 0.1f, 0.0f};
+mit_tuning_t pitch_mit_tuning = {200.0f, 2.0f, -0.5f};
 struct gimbal_debug_t
 {
     float pos_set;
@@ -52,6 +55,70 @@ struct gimbal_debug_t
 gimbal_debug_t pitch_debug;
 gimbal_debug_t yaw_debug;
 msg_ins_t debug_ins;
+int16_t debug_yaw_cur;
+#endif
+
+// #define NONVISION
+#ifdef NONVISION
+static float signal(float t, float T, float step_value)
+{
+    constexpr float buffer_ratio = 1.0 / 5.0;
+    constexpr float rise_ratio = 4.0 / 5.0;
+
+    const float t_mod = std::fmod(t, T);
+
+    float buffer_time = buffer_ratio * T;
+    float rise_time = rise_ratio * T;
+
+    if (t_mod < buffer_time)
+    {
+        // 前1/5缓冲段
+        return 0.0;
+    }
+    else if (t_mod < T)
+    {
+        const float rise_t = t_mod - buffer_time;
+        const float progress = rise_t / rise_time; // 0 ~ 1
+
+        const float smooth = (1 - std::cos(Numeric::Pi * progress)) / 2.0;
+
+        return step_value * smooth;
+    }
+    else
+    {
+        return 0.0;
+    }
+}
+
+static float tri_signal(float t, float T, float step_value)
+{
+    const float t_mod = std::fmod(t, T);
+
+    if (t_mod < T / 2.0)
+    {
+        return step_value * (t_mod / (T / 2.0));
+    }
+    else
+    {
+        return step_value * (1.0 - (t_mod - T / 2.0) / (T / 2.0));
+    }
+}
+
+static float tri_signal_dot(float t, float T, float step_value)
+{
+    const float t_mod = std::fmod(t, T);
+    
+    if (t_mod < T / 2.0f)
+        return step_value * (2.0f * t_mod / T - 0.5f) * 2.0f;
+    else
+        return step_value * (1.5f - 2.0f * t_mod / T) * 2.0f; 
+}
+
+static float sin_signal(float t, float T, float amplitude)
+{
+    const float omega = 2.0 * M_PI / T; // 角频率 ω = 2π / T
+    return amplitude * std::sin(omega * t);
+}
 #endif
 
 [[noreturn]] void ControlThreadFun(ULONG initial_input) 
@@ -73,8 +140,8 @@ msg_ins_t debug_ins;
     DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x202);
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x201);
 
-    MIT yaw_mit = MIT(1.0f, 0.1f, -50.0f, 50.0f);
-    MIT pitch_mit = MIT(5.0f, 0.1f, -50.0f, 50.0f);
+    MIT yaw_mit = MIT(5.0f, 0.1f, -5.0f, 5.0f);
+    MIT pitch_mit = MIT(5.0f, 0.1f, -5.0f, 5.0f);
 
     constexpr float Tk_6020 = 5000.0f; // 16384/3A*0.741Nm/A
     constexpr float Yaw_Inertia = 0.00005f;
@@ -112,10 +179,21 @@ msg_ins_t debug_ins;
     shooter_state_e shooter_state = CLOSED;
 
     KalmanFilter_1D gyro_pitch_filter;
+    KalmanFilter_1D gyro_yaw_filter;
     gyro_pitch_filter.SetQ(0.0001f);
     gyro_pitch_filter.SetR(1.0f);
+    gyro_yaw_filter.SetQ(0.0001f);
+    gyro_yaw_filter.SetR(1.0f);
 
     bool inited = false;
+
+#ifdef NONVISION
+    constexpr float yaw_signal_T = 0.5f;
+    constexpr float yaw_signal_step = 0.12f;
+    constexpr float pitch_signal_T = 0.2f;
+    constexpr float pitch_signal_step = 0.012f;
+    float yaw_init = 0.0f;
+#endif
 
     for (;;) 
     {
@@ -148,6 +226,9 @@ msg_ins_t debug_ins;
             inited  = false;
             motor.yaw_cur = 0;
             Jpitch.currentSet = 0;
+        #ifdef NONVISION
+            yaw_init = 0.0f;
+        #endif
             if (cmd.ifmove)
             {
                 gimbal_state = MANUALAIM;
@@ -180,27 +261,38 @@ msg_ins_t debug_ins;
 
             if (!inited)
             {
-                yaw_mit.pos_ref = 0.0f;
                 pitch_mit.pos_ref = 0.0f;
-                if (fabs(ins.pitch) < 5.0f)
+                if (fabs(ins.pitch) < 1.0f)
                     inited = true;
             }
             else 
             {
-                yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.1f;
-                pitch_mit.pos_ref = ins.pitch*DegreeToRad + cmd.dpitch*0.1f;
+            #ifdef NONVISION
+                // pitch_mit.pos_ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
+                pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
+            #else
+                pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
+            #endif
             }
 
+        #ifdef NONVISION
+            if (yaw_init == 0.0f)
+                yaw_init = ins.total_yaw*DegreeToRad;
+            yaw_mit.pos_ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+            yaw_mit.vel_ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+        #else
+            yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.1f;
+            yaw_mit.vel_ref = 0.0f;
+        #endif
             yaw_mit.pos_fdb = ins.total_yaw*DegreeToRad;
-            yaw_mit.vel_ref = ins.gyro_y+cmd.dyaw*0.1f;
-            yaw_mit.vel_fdb = ins.gyro_y;
+            yaw_mit.vel_fdb = gyro_yaw_filter.Update(ins.gyro_y);
 
             pitch_mit.pos_fdb = ins.pitch*DegreeToRad;
             pitch_mit.vel_ref = 0.0f;//cmd.dpitch;
             pitch_mit.vel_fdb = gyro_pitch_filter.Update(ins.gyro_p);
-            pitch_mit.torque = -1.0f;
+            pitch_mit.torque = pitch_mit_tuning.tcomp*arm_cos_f32(ins.pitch*DegreeToRad);
             
-            motor.yaw_cur = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
+            motor.yaw_cur = static_cast<int16_t>(-yaw_mit.Update() * Tk_6020);
             Jpitch.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
 
             if (cmd.auto_aim)
@@ -283,7 +375,8 @@ msg_ins_t debug_ins;
         yaw_debug.pos_set = yaw_mit.pos_ref;
         yaw_debug.pos_fdb = ins.total_yaw*DegreeToRad;
         yaw_debug.spd_set = yaw_mit.vel_ref;
-        yaw_debug.spd_fdb = ins.gyro_y;
+        yaw_debug.spd_fdb = gyro_yaw_filter.Update(ins.gyro_y);
+        debug_yaw_cur = motor.yaw_cur;
         pitch_debug.pos_set = pitch_mit.pos_ref;
         pitch_debug.pos_fdb = ins.pitch*DegreeToRad;
         pitch_debug.spd_set = pitch_mit.vel_ref;

@@ -7,11 +7,14 @@
 
 #include "om.h"
 #include "magicmsgs.hpp"
+#include "tx_api.h"
 #include <cstring>
 
 extern FDCAN_HandleTypeDef hfdcan1;
 extern FDCAN_HandleTypeDef hfdcan2;
 extern FDCAN_HandleTypeDef hfdcan3;
+
+TX_SEMAPHORE CANErrorSem;
 
 uint8_t CommMsg[8] = {0};
 
@@ -40,17 +43,38 @@ void CAN_Init(void)
 
     HAL_FDCAN_ConfigFilter(&hfdcan1, &FDCAN_FilterConfig);
     HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
-    HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+    HAL_FDCAN_ActivateNotification(&hfdcan1, 
+        FDCAN_IT_RX_FIFO0_NEW_MESSAGE |
+        FDCAN_IT_BUS_OFF              |
+        FDCAN_IT_ERROR_WARNING        |   // 错误计数器超过96
+        FDCAN_IT_ERROR_PASSIVE        |   // 错误计数器超过127
+        FDCAN_IT_ARB_PROTOCOL_ERROR   |   // 仲裁阶段协议错误
+        FDCAN_IT_DATA_PROTOCOL_ERROR,     // 数据阶段协议错误
+        0);
     HAL_FDCAN_Start(&hfdcan1);
 
     HAL_FDCAN_ConfigFilter(&hfdcan2, &FDCAN_FilterConfig);
     HAL_FDCAN_ConfigGlobalFilter(&hfdcan2, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
-    HAL_FDCAN_ActivateNotification(&hfdcan2, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+    HAL_FDCAN_ActivateNotification(&hfdcan2, 
+        FDCAN_IT_RX_FIFO0_NEW_MESSAGE |
+        FDCAN_IT_BUS_OFF              |
+        FDCAN_IT_ERROR_WARNING        |   // 错误计数器超过96
+        FDCAN_IT_ERROR_PASSIVE        |   // 错误计数器超过127
+        FDCAN_IT_ARB_PROTOCOL_ERROR   |   // 仲裁阶段协议错误
+        FDCAN_IT_DATA_PROTOCOL_ERROR,     // 数据阶段协议错误
+        0);
     HAL_FDCAN_Start(&hfdcan2);
 
     HAL_FDCAN_ConfigFilter(&hfdcan3, &FDCAN_FilterConfig);
     HAL_FDCAN_ConfigGlobalFilter(&hfdcan3, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
-    HAL_FDCAN_ActivateNotification(&hfdcan3, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+    HAL_FDCAN_ActivateNotification(&hfdcan3, 
+        FDCAN_IT_RX_FIFO0_NEW_MESSAGE |
+        FDCAN_IT_BUS_OFF              |
+        FDCAN_IT_ERROR_WARNING        |   // 错误计数器超过96
+        FDCAN_IT_ERROR_PASSIVE        |   // 错误计数器超过127
+        FDCAN_IT_ARB_PROTOCOL_ERROR   |   // 仲裁阶段协议错误
+        FDCAN_IT_DATA_PROTOCOL_ERROR,     // 数据阶段协议错误
+        0);
     HAL_FDCAN_Start(&hfdcan3);
 }
 
@@ -170,6 +194,14 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 
 void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t ErrorStatusITs)
 {
+    if ((ErrorStatusITs & FDCAN_IT_ERROR_WARNING) || (ErrorStatusITs & FDCAN_IT_ERROR_PASSIVE) || 
+        (ErrorStatusITs & FDCAN_IT_ARB_PROTOCOL_ERROR) || 
+        (ErrorStatusITs & FDCAN_IT_DATA_PROTOCOL_ERROR))
+    {
+        // 错误计数器超过96，进入错误警告状态
+        tx_semaphore_put(&CANErrorSem);
+    }
+    
     if ((ErrorStatusITs & FDCAN_IT_BUS_OFF) != RESET)
     {
         // CAN总线离线, 重新启动CAN

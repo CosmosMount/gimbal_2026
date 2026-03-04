@@ -1,7 +1,3 @@
-//
-// Created by cosmosmount on 2025/8/30.
-//
-
 #ifndef RM26_LED_HPP
 #define RM26_LED_HPP
 
@@ -16,7 +12,8 @@ enum LED_COLOR
 {
     LED_RED = 0,
     LED_GREEN,
-    LED_BLUE
+    LED_BLUE,
+    LED_WHITE
 };
 
 /**
@@ -49,7 +46,7 @@ void LED_toggle(enum LED_COLOR color);
  * @param  fre: 闪烁频率
  * @todo 闪烁频率单位还有极限值未确定
  */
-void LED_blink();
+void LED_blink(enum LED_COLOR color);
 
 /**
  * @brief  关闭所有LED灯
