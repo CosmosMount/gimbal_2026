@@ -33,8 +33,8 @@ extern uint8_t CommMsg[8];
     om_suber_t *vision_suber = om_subscribe(om_find_topic("visionrx", UINT32_MAX));
     msg_visionrx_t vision_rx{};
 
-    uint8_t UIMsg[UIMSG_SIZE];
-    uint8_t CmdMsg[CMDMSG_SIZE];
+    uint8_t UIMsg[8];
+    uint8_t CmdMsg[8];
 
     comm_ui_t ui_msg;
     comm_cmd_t cmd_msg;
@@ -56,6 +56,7 @@ extern uint8_t CommMsg[8];
         cmd_msg.dlen = static_cast<int8_t>((remoter.key.CTRL ? ((remoter.key.Q ? 1.0f : 0.0f) - (remoter.key.E ? 1.0f : 0.0f)) : 0.0f)*10);
         cmd.dpitch = remoter.mouse_x + remoter.right_y;
         cmd.dyaw = remoter.mouse_y + remoter.right_x;
+        cmd.shooter_type = NORMAL;
         if (!remoter.last_key.Z && remoter.key.Z)
             cmd.shooter_type = SINGLE;
         if (!remoter.last_key.X && remoter.key.X)
@@ -69,6 +70,8 @@ extern uint8_t CommMsg[8];
             cmd.shoot = false;
         if (remoter.mouse_left || remoter.shoot_sw == Fire)
             cmd.fire = true;
+        else
+            cmd.fire = false;
         if (remoter.mouse_right)
             cmd.auto_aim = true;
         else
@@ -76,8 +79,12 @@ extern uint8_t CommMsg[8];
 
         if (remoter.key.SHIFT)
             cmd.ifspin = true;
+        else
+            cmd.ifspin = false;
         if (!remoter.last_key.B && remoter.key.B)
             cmd.ifjump = true;
+        else
+            cmd.ifjump = false;
         if (remoter.key.CTRL && remoter.key.G)
             ui_reset = 1;
 
@@ -99,8 +106,8 @@ extern uint8_t CommMsg[8];
         memcpy(&UIMsg, reinterpret_cast<uint8_t*>(&ui_msg), sizeof(comm_ui_t));
         memcpy(&CmdMsg, reinterpret_cast<uint8_t*>(&cmd_msg), sizeof(comm_cmd_t));
 
-        FDCAN_Transmit(&hfdcan2, 0xB1, UIMsg, UIMSG_SIZE);
-        FDCAN_Transmit(&hfdcan2, 0xB2, CmdMsg, CMDMSG_SIZE);
+        CAN_Transmit(&hfdcan2, 0xB1, UIMsg, 8);
+        CAN_Transmit(&hfdcan2, 0xB2, CmdMsg, 8);
 
         comm = *reinterpret_cast<comm_chassis_t*>(CommMsg);
 

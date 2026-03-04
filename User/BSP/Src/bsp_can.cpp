@@ -25,13 +25,6 @@ void FDCAN_Init(void)
     FDCAN_FilterConfig.FilterID1 = 0x00000000;
     FDCAN_FilterConfig.FilterID2 = 0x00000000;
     FDCAN_FilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO1;
-
-    HAL_FDCAN_ConfigFilter(&hfdcan2, &FDCAN_FilterConfig);
-    HAL_FDCAN_ConfigGlobalFilter(&hfdcan2, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
-    HAL_FDCAN_ActivateNotification(&hfdcan2, FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0);
-    HAL_FDCAN_EnableTxDelayCompensation(&hfdcan2);
-    HAL_FDCAN_ConfigTxDelayCompensation(&hfdcan2,13,13);
-    HAL_FDCAN_Start(&hfdcan2);
 }
 
 void CAN_Init(void)
@@ -49,6 +42,11 @@ void CAN_Init(void)
     HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
     HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
     HAL_FDCAN_Start(&hfdcan1);
+
+    HAL_FDCAN_ConfigFilter(&hfdcan2, &FDCAN_FilterConfig);
+    HAL_FDCAN_ConfigGlobalFilter(&hfdcan2, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
+    HAL_FDCAN_ActivateNotification(&hfdcan2, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+    HAL_FDCAN_Start(&hfdcan2);
 
     HAL_FDCAN_ConfigFilter(&hfdcan3, &FDCAN_FilterConfig);
     HAL_FDCAN_ConfigGlobalFilter(&hfdcan3, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
@@ -145,6 +143,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             DMMotorHandler::Instance()->UpdateFeedback(hfdcan, rx_data, int(rx_header.Identifier - DM_MASTER_ID));
         }
     }
+
+    /*----------------------------------------------------底盘数据----------------------------------------------------*/
+    else if (rx_header.Identifier == 0xC1)
+    {
+        memcpy(CommMsg, rx_data, 8);
+    }
 }
 
 void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
@@ -161,11 +165,7 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
         }
     }
 
-    /*----------------------------------------------------底盘数据----------------------------------------------------*/
-    else if (rx_header.Identifier == 0xC1)
-    {
-        memcpy(CommMsg, rx_data, 8);
-    }
+    
 }
 
 void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t ErrorStatusITs)

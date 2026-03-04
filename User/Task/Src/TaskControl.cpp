@@ -227,8 +227,8 @@ msg_ins_t debug_ins;
             break;
 
         case SHOOT:
-            Lfric.speedSet = -660;
-            Rfric.speedSet = 660;
+            Lfric.speedSet = 660;
+            Rfric.speedSet = -660;
             if (((yaw_mit.pos_ref-yaw_mit.pos_fdb)<0.01f 
                 && (pitch_mit.pos_ref-pitch_mit.pos_fdb)<0.002f 
                 && vision_rx.fire)
@@ -240,11 +240,12 @@ msg_ins_t debug_ins;
                     motor.tri_spd = 6;
                     break;
                 case NORMAL:
-                    motor.tri_spd = BulletFreq[comm.level-1][1];
-                    if (comm.heat_now >= comm.heat_limit*0.75f)
-                        motor.tri_spd = BulletFreq[comm.level-1][0];
-                    if (comm.heat_now >= comm.heat_limit*0.85f)
-                        motor.tri_spd = 0;
+                    // motor.tri_spd = BulletFreq[comm.level-1][1];
+                    // if (comm.heat_now >= comm.heat_limit*0.75f)
+                    //     motor.tri_spd = BulletFreq[comm.level-1][0];
+                    // if (comm.heat_now >= comm.heat_limit*0.85f)
+                    //     motor.tri_spd = 0;
+                    motor.tri_spd = 4;
                     break;
                 case BURST:
                     motor.tri_spd = BulletFreq[comm.level-1][2];
