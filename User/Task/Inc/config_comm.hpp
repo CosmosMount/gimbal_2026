@@ -4,6 +4,7 @@
 
 struct comm_chassis_t
 {
+    uint8_t inited : 1;
     uint8_t color : 1;
     uint8_t level : 4;
     uint16_t heatlimit : 9;

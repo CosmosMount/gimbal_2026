@@ -11,11 +11,14 @@
 
 #ifdef DEBUG
 msg_remoter_t debug_remoter;
+comm_chassis_t debug_comm;
 #endif
 
 TX_THREAD OperateThread;
 uint8_t OperateThreadStack[2048] = {0};
 extern uint8_t CommMsg[8];
+
+extern TX_SEMAPHORE IMUThreadSem;
 
 [[noreturn]] void OperateThreadFun(ULONG initial_input) 
 {
@@ -47,7 +50,9 @@ extern uint8_t CommMsg[8];
         om_suber_export(vision_suber, &vision_rx, false);
         om_suber_export(motor_suber, &motor, false);
 
-        if (remoter.ctrl_sw == Normal)
+        comm = *reinterpret_cast<comm_chassis_t*>(CommMsg);
+
+        if (remoter.ctrl_sw == Normal && tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) == TX_SUCCESS)
             cmd.ifmove = true;
         else
             cmd.ifmove = false;
@@ -103,18 +108,19 @@ extern uint8_t CommMsg[8];
         cmd_msg.yaw_cur = motor.yaw_cur;
         cmd_msg.tri_spd = motor.tri_spd;
 
+        cmd.chassis_inited = comm.inited;
+
         memcpy(&UIMsg, reinterpret_cast<uint8_t*>(&ui_msg), sizeof(comm_ui_t));
         memcpy(&CmdMsg, reinterpret_cast<uint8_t*>(&cmd_msg), sizeof(comm_cmd_t));
 
         CAN_Transmit(&hfdcan2, 0xB1, UIMsg, 8);
         CAN_Transmit(&hfdcan2, 0xB2, CmdMsg, 8);
 
-        comm = *reinterpret_cast<comm_chassis_t*>(CommMsg);
-
         om_publish(cmd_topic, &cmd, sizeof(msg_cmd_t), true, false);
         om_publish(comm_topic, &comm, sizeof(comm_chassis_t), true, false);
     #ifdef DEBUG
         debug_remoter = remoter;
+        debug_comm = comm;
     #endif
         tx_thread_sleep(1);
     }

@@ -30,6 +30,7 @@ struct msg_cmd_t
     float dyaw;
     float dpitch;
     uint8_t aim_target;
+    bool chassis_inited;
     bool ifmove;
     bool ifjump;
     bool ifspin;

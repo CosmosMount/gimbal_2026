@@ -125,7 +125,7 @@ static float sin_signal(float t, float T, float amplitude)
 {
     UNUSED(initial_input);
 
-    GM6020 Jpitch;
+    GM6020 pitch_motor;
     M3508 Lfric;
     M3508 Rfric;
 
@@ -136,7 +136,7 @@ static float sin_signal(float t, float T, float amplitude)
     Rfric.gearBox = GearBox_None;
     Rfric.speedPid.kp = 100.0f;
 
-    DJIMotorHandler::Instance()->registerMotor(&Jpitch, &hfdcan1, 0x205);
+    DJIMotorHandler::Instance()->registerMotor(&pitch_motor, &hfdcan1, 0x205);
     DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x202);
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x201);
 
@@ -225,7 +225,7 @@ static float sin_signal(float t, float T, float amplitude)
         case RELAX:
             inited  = false;
             motor.yaw_cur = 0;
-            Jpitch.currentSet = 0;
+            pitch_motor.currentSet = 0;
         #ifdef NONVISION
             yaw_init = 0.0f;
         #endif
@@ -254,14 +254,14 @@ static float sin_signal(float t, float T, float amplitude)
             pitch_mit.pos_fdb = ins.pitch;
             pitch_mit.vel_fdb = ins.gyro_p;
             motor.yaw_cur = static_cast<uint16_t>(yaw_mit.Update() * Tk_6020);
-            Jpitch.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
+            pitch_motor.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
             break;
 
         case MANUALAIM:
 
             if (!inited)
             {
-                pitch_mit.pos_ref = 0.0f;
+                pitch_motor.currentSet = ins.pitch > 0.0f ? -8000 : 8000;
                 if (fabs(ins.pitch) < 1.0f)
                     inited = true;
             }
@@ -273,27 +273,28 @@ static float sin_signal(float t, float T, float amplitude)
             #else
                 pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
             #endif
+             #ifdef NONVISION
+                if (yaw_init == 0.0f)
+                    yaw_init = ins.total_yaw*DegreeToRad;
+                yaw_mit.pos_ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+                yaw_mit.vel_ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+            #else
+                yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.1f;
+                yaw_mit.vel_ref = 0.0f;
+            #endif
+                yaw_mit.pos_fdb = ins.total_yaw*DegreeToRad;
+                yaw_mit.vel_fdb = gyro_yaw_filter.Update(ins.gyro_y);
+
+                pitch_mit.pos_fdb = ins.pitch*DegreeToRad;
+                pitch_mit.vel_ref = 0.0f;//cmd.dpitch;
+                pitch_mit.vel_fdb = gyro_pitch_filter.Update(ins.gyro_p);
+                pitch_mit.torque = pitch_mit_tuning.tcomp*arm_cos_f32(ins.pitch*DegreeToRad);
+                
+                motor.yaw_cur = static_cast<int16_t>(-yaw_mit.Update() * Tk_6020);
+                pitch_motor.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
             }
 
-        #ifdef NONVISION
-            if (yaw_init == 0.0f)
-                yaw_init = ins.total_yaw*DegreeToRad;
-            yaw_mit.pos_ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
-            yaw_mit.vel_ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
-        #else
-            yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.1f;
-            yaw_mit.vel_ref = 0.0f;
-        #endif
-            yaw_mit.pos_fdb = ins.total_yaw*DegreeToRad;
-            yaw_mit.vel_fdb = gyro_yaw_filter.Update(ins.gyro_y);
-
-            pitch_mit.pos_fdb = ins.pitch*DegreeToRad;
-            pitch_mit.vel_ref = 0.0f;//cmd.dpitch;
-            pitch_mit.vel_fdb = gyro_pitch_filter.Update(ins.gyro_p);
-            pitch_mit.torque = pitch_mit_tuning.tcomp*arm_cos_f32(ins.pitch*DegreeToRad);
-            
-            motor.yaw_cur = static_cast<int16_t>(-yaw_mit.Update() * Tk_6020);
-            Jpitch.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
+       
 
             if (cmd.auto_aim)
             {
@@ -362,8 +363,8 @@ static float sin_signal(float t, float T, float amplitude)
     #ifdef DEBUG
         debug_ins = ins;
         
-        debug_motor.pitchmotor_spd = Jpitch.motorFeedback.speedFdb;
-        debug_motor.pitchmotor_cur = Jpitch.motorFeedback.currentFdb;
+        debug_motor.pitchmotor_spd = pitch_motor.motorFeedback.speedFdb;
+        debug_motor.pitchmotor_cur = pitch_motor.motorFeedback.currentFdb;
         debug_motor.lfric_spd = Lfric.motorFeedback.speedFdb;
         debug_motor.lfric_cur = Lfric.motorFeedback.currentFdb;
         debug_motor.rfric_spd = Rfric.motorFeedback.speedFdb;
