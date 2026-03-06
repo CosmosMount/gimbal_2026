@@ -58,7 +58,7 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.ifmove = false;
         cmd_msg.vx = static_cast<int8_t>(((remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>(((remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f)+remoter.left_x)*10);
-        cmd_msg.dlen = static_cast<int8_t>((remoter.key.CTRL ? ((remoter.key.Q ? 1.0f : 0.0f) - (remoter.key.E ? 1.0f : 0.0f)) : 0.0f)*10);
+        cmd_msg.dlen = static_cast<int8_t>((remoter.key.CTRL ? ((remoter.key.Q ? 1.0f : 0.0f) - (remoter.key.E ? 1.0f : 0.0f)):0.0f)*10);
         cmd.dpitch = remoter.mouse_x + remoter.right_y;
         cmd.dyaw = remoter.mouse_y + remoter.right_x;
         cmd.shooter_type = NORMAL;

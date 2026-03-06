@@ -186,6 +186,10 @@ static float sin_signal(float t, float T, float amplitude)
     gyro_yaw_filter.SetR(1.0f);
 
     bool inited = false;
+    bool maintained_yaw = false;
+    bool maintained_pitch = false;
+    float yaw_maintain = 0.0f;
+    float pitch_maintain = 0.0f;
 
 #ifdef NONVISION
     constexpr float yaw_signal_T = 0.5f;
@@ -270,16 +274,40 @@ static float sin_signal(float t, float T, float amplitude)
             #ifdef NONVISION
                 // pitch_mit.pos_ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
                 pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
-            #else
-                pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
-            #endif
-             #ifdef NONVISION
                 if (yaw_init == 0.0f)
                     yaw_init = ins.total_yaw*DegreeToRad;
                 yaw_mit.pos_ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
                 yaw_mit.vel_ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
             #else
-                yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.1f;
+                if (fabs(cmd.dpitch)<0.005f)
+                {
+                    if (!maintained_pitch)
+                    {
+                        pitch_maintain = ins.pitch*DegreeToRad;
+                        maintained_pitch = true;
+                    }
+                    pitch_mit.pos_ref = pitch_maintain;
+                }
+                else
+                {
+                    maintained_pitch = false;
+                    pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
+                }
+                
+                if (fabs(cmd.dyaw)<0.005f)
+                {
+                    if (!maintained_yaw)
+                    {
+                        yaw_maintain = ins.total_yaw*DegreeToRad;
+                        maintained_yaw = true;
+                    }
+                    yaw_mit.pos_ref = yaw_maintain;
+                }
+                else
+                {
+                    maintained_yaw = false;
+                    yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.05f;
+                }
                 yaw_mit.vel_ref = 0.0f;
             #endif
                 yaw_mit.pos_fdb = ins.total_yaw*DegreeToRad;
