@@ -108,8 +108,6 @@ extern TX_SEMAPHORE IMUThreadSem;
         cmd_msg.yaw_cur = motor.yaw_cur;
         cmd_msg.tri_spd = motor.tri_spd;
 
-        cmd.chassis_inited = comm.inited;
-
         memcpy(&UIMsg, reinterpret_cast<uint8_t*>(&ui_msg), sizeof(comm_ui_t));
         memcpy(&CmdMsg, reinterpret_cast<uint8_t*>(&cmd_msg), sizeof(comm_cmd_t));
 

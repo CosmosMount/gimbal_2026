@@ -18,6 +18,7 @@
 #include "GM6020.hpp"
 #include "DJIMotorHandler.hpp"
 
+#include "config_comm.hpp"
 #include "config_gimbal.hpp"
 
 using namespace Filter;
@@ -43,8 +44,8 @@ typedef struct
     float kd;
     float tcomp;
 } mit_tuning_t;
-mit_tuning_t yaw_mit_tuning = {5.0f, 0.1f, 0.0f};
-mit_tuning_t pitch_mit_tuning = {200.0f, 2.0f, -0.5f};
+mit_tuning_t yaw_mit_tuning = {2.5f, 0.01f, 0.0f};
+mit_tuning_t pitch_mit_tuning = {60.0f, 1.0f, -0.5f};
 struct gimbal_debug_t
 {
     float pos_set;
@@ -157,7 +158,7 @@ static float sin_signal(float t, float T, float amplitude)
         {6.5*0.78f, 9*0.78f, 16*0.78f},
         {7*0.78f, 9.5*0.78f, 16*0.78f},
         {7.5*0.78f, 10*0.78f, 16*0.78f},
-        {7.5*0.78f, 11*0.78f, 16}
+        {7.5*0.78f, 11*0.78f, 16*0.78f}
     };
 
     om_topic_t *motor_topic = om_config_topic(nullptr, "ca", "motor", sizeof(msg_motor_t));
@@ -173,7 +174,7 @@ static float sin_signal(float t, float T, float amplitude)
     om_suber_t *cmd_suber = om_subscribe(om_find_topic("cmd", UINT32_MAX));
     msg_cmd_t cmd{};
     om_suber_t *comm_suber = om_subscribe(om_find_topic("comm", UINT32_MAX));
-    msg_comm_t comm{};
+    comm_chassis_t comm{};
 
     gimbal_state_e gimbal_state = RELAX;
     shooter_state_e shooter_state = CLOSED;
@@ -230,6 +231,10 @@ static float sin_signal(float t, float T, float amplitude)
             inited  = false;
             motor.yaw_cur = 0;
             pitch_motor.currentSet = 0;
+            yaw_maintain = ins.total_yaw*DegreeToRad;
+            pitch_maintain = ins.pitch*DegreeToRad;
+            maintained_yaw = false;
+            maintained_pitch = false;
         #ifdef NONVISION
             yaw_init = 0.0f;
         #endif
@@ -265,9 +270,15 @@ static float sin_signal(float t, float T, float amplitude)
 
             if (!inited)
             {
+                yaw_mit.pos_ref  = ins.total_yaw * DegreeToRad;
+                pitch_mit.pos_ref = ins.pitch * DegreeToRad;
                 pitch_motor.currentSet = ins.pitch > 0.0f ? -8000 : 8000;
                 if (fabs(ins.pitch) < 1.0f)
-                    inited = true;
+                {
+                    pitch_motor.currentSet = -2500;
+                    if (comm.inited)
+                        inited = true;
+                }
             }
             else 
             {
@@ -291,7 +302,7 @@ static float sin_signal(float t, float T, float amplitude)
                 else
                 {
                     maintained_pitch = false;
-                    pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
+                    pitch_mit.pos_ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.65f, 0.45f);
                 }
                 
                 if (fabs(cmd.dyaw)<0.005f)
@@ -308,9 +319,10 @@ static float sin_signal(float t, float T, float amplitude)
                     maintained_yaw = false;
                     yaw_mit.pos_ref = ins.total_yaw*DegreeToRad+cmd.dyaw*0.05f;
                 }
-                yaw_mit.vel_ref = 0.0f;
+                
             #endif
                 yaw_mit.pos_fdb = ins.total_yaw*DegreeToRad;
+                yaw_mit.vel_ref = 0.0f;
                 yaw_mit.vel_fdb = gyro_yaw_filter.Update(ins.gyro_y);
 
                 pitch_mit.pos_fdb = ins.pitch*DegreeToRad;
@@ -318,11 +330,9 @@ static float sin_signal(float t, float T, float amplitude)
                 pitch_mit.vel_fdb = gyro_pitch_filter.Update(ins.gyro_p);
                 pitch_mit.torque = pitch_mit_tuning.tcomp*arm_cos_f32(ins.pitch*DegreeToRad);
                 
-                motor.yaw_cur = static_cast<int16_t>(-yaw_mit.Update() * Tk_6020);
-                pitch_motor.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);
+                motor.yaw_cur = static_cast<int16_t>(-yaw_mit.Update() * Tk_6020);//0;//
+                pitch_motor.currentSet = static_cast<int16_t>(pitch_mit.Update() * Tk_6020);//0;//
             }
-
-       
 
             if (cmd.auto_aim)
             {
@@ -370,9 +380,9 @@ static float sin_signal(float t, float T, float amplitude)
                     break;
                 case BURST:
                     motor.tri_spd = BulletFreq[comm.level-1][2];
-                    if (comm.heat_now >= comm.heat_limit*0.75f)
+                    if (comm.heatnow >= comm.heatlimit*0.75f)
                         motor.tri_spd = BulletFreq[comm.level-1][0];
-                    if (comm.heat_now >= comm.heat_limit*0.85f)
+                    if (comm.heatnow >= comm.heatlimit*0.85f)
                         motor.tri_spd = 0;
                     break;
                 }
@@ -404,12 +414,12 @@ static float sin_signal(float t, float T, float amplitude)
         yaw_debug.pos_set = yaw_mit.pos_ref;
         yaw_debug.pos_fdb = ins.total_yaw*DegreeToRad;
         yaw_debug.spd_set = yaw_mit.vel_ref;
-        yaw_debug.spd_fdb = gyro_yaw_filter.Update(ins.gyro_y);
+        yaw_debug.spd_fdb = yaw_mit.vel_fdb;
         debug_yaw_cur = motor.yaw_cur;
         pitch_debug.pos_set = pitch_mit.pos_ref;
         pitch_debug.pos_fdb = ins.pitch*DegreeToRad;
         pitch_debug.spd_set = pitch_mit.vel_ref;
-        pitch_debug.spd_fdb = gyro_pitch_filter.Update(ins.gyro_p);
+        pitch_debug.spd_fdb = pitch_mit.vel_fdb;
     #endif
         tx_thread_sleep(1);
     }

@@ -5,28 +5,21 @@ using namespace Numeric;
 
 namespace Filter
 {
-    IIRFilter::IIRFilter(uint8_t _order, Filter_Mode _mode, int _freq_low, int _freq_high)
+    IIRFilter::IIRFilter(float omega_n, float zeta, float dt)
     {
-        num_stage = _order / 2;
-        if (_mode == LOWPASS)
-        {
-            switch (_freq_low)
-            {
-            case 2:
-                coeff = {
-                    //b0  b1    b2    a1                                          a2
-                    1.0f, 2.0f, 1.0f, 1.982228929792528626663283830566797405481f, -0.982385450614125299573231586691690608859f
-                };
-                gain = 0.000039130205399144361486617194056947255f;
-            case 333:
-                coeff = {
-                    //b0  b1    b2    a1                                           a2
-                    1.0f, 2.0f, 1.0f, -0.617669743139197424675046477204887196422f, -0.239839843702840921357832826288358774036f
-                };
-                gain = 0.464377396710509593447113729780539870262f;
-            }
-        }
-        arm_biquad_cascade_df1_init_f32(&section, num_stage, coeff.data(), buff);
+        // Tustin 离散化计算 b0/b1/b2/a1/a2
+        const float K   = 2.0f / dt;
+        const float wn2 = omega_n * omega_n;
+        const float den = K*K + 2.0f*zeta*omega_n*K + wn2;
+
+        coeff[0] = wn2 / den;           // b0
+        coeff[1] = 2.0f * coeff[0];     // b1
+        coeff[2] = coeff[0];            // b2
+        coeff[3] = -(2.0f*wn2 - 2.0f*K*K) / den;  // -a1（CMSIS符号约定取负）
+        coeff[4] = -(K*K - 2.0f*zeta*omega_n*K + wn2) / den; // -a2
+
+        gain = 1.0f; // 已归一化
+        arm_biquad_cascade_df1_init_f32(&section, 1, coeff.data(), buff);
     }
 
     float IIRFilter::Update(float _input) const

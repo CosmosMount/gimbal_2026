@@ -73,19 +73,12 @@ namespace Filter
     {
     public:
         /**
-         * @brief 构造函数：初始化滤波器参数并计算系数
-         *
-         * @param _order 滤波器阶数
-         * @param _mode 滤波器模式
-         * @param _freq_low 低频（非高通有效）
-         * @param _freq_high 高频（非低通有效）
-         * @note 请修改构造函数以引入现在不存在的阶数、模式
+          * @brief 二阶低通滤波器（双二阶 Biquad）
+          *        用于 DOB 的 Q(s) 滤波器实现
+          *        H(s) = ωn² / (s² + 2ζωn·s + ωn²)
+          *        Tustin（双线性）离散化
          */
-        explicit IIRFilter(
-            uint8_t _order = 2,
-            Filter_Mode _mode = LOWPASS,
-            int _freq_low = 1,
-            int _freq_high = 500);
+        explicit IIRFilter(float omega_n, float zeta, float dt);
 
         /**
          * @brief 通过 SOS(Second-Order Section)二阶级联方法实现 IIR

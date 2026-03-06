@@ -30,7 +30,6 @@ struct msg_cmd_t
     float dyaw;
     float dpitch;
     uint8_t aim_target;
-    bool chassis_inited;
     bool ifmove;
     bool ifjump;
     bool ifspin;
@@ -38,14 +37,6 @@ struct msg_cmd_t
     bool fire;
     bool auto_aim;
     shooter_type_e shooter_type;
-};
-
-struct msg_comm_t
-{
-    float heat_limit;
-    float heat_now;
-    uint8_t color;
-    uint8_t level;
 };
 
 struct msg_motor_t
