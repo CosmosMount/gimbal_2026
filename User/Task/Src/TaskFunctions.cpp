@@ -56,11 +56,13 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.ifmove = true;
         else
             cmd.ifmove = false;
+
         cmd_msg.vx = static_cast<int8_t>(((remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>(((remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f)+remoter.left_x)*10);
-        cmd_msg.dlen = static_cast<int8_t>((remoter.key.CTRL ? ((remoter.key.Q ? 1.0f : 0.0f) - (remoter.key.E ? 1.0f : 0.0f)):0.0f)*10);
-        cmd.dpitch = remoter.mouse_x + remoter.right_y;
-        cmd.dyaw = remoter.mouse_y + remoter.right_x;
+        cmd_msg.dlen = static_cast<int8_t>(((remoter.key.E ? 1.0f : 0.0f) - (remoter.key.Q ? 1.0f : 0.0f))*10);//((remoter.key.CTRL ? ():0.0f)*10);
+        cmd.dpitch = remoter.mouse_y + remoter.right_y;
+        cmd.dyaw = remoter.mouse_x + remoter.right_x;
+
         cmd.shooter_type = NORMAL;
         if (!remoter.last_key.Z && remoter.key.Z)
             cmd.shooter_type = SINGLE;
@@ -73,10 +75,13 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.shoot = true;
         else
             cmd.shoot = false;
-        if (remoter.mouse_left || remoter.shoot_sw == Fire)
+
+        if ((remoter.shoot_sw == Warm && remoter.mouse_left)
+             || remoter.shoot_sw == Fire)
             cmd.fire = true;
         else
             cmd.fire = false;
+
         if (remoter.mouse_right)
             cmd.auto_aim = true;
         else
@@ -86,10 +91,12 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.ifspin = true;
         else
             cmd.ifspin = false;
+
         if (!remoter.last_key.B && remoter.key.B)
             cmd.ifjump = true;
         else
             cmd.ifjump = false;
+
         if (remoter.key.CTRL && remoter.key.G)
             ui_reset = 1;
 
