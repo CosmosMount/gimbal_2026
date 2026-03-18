@@ -52,7 +52,9 @@ extern TX_SEMAPHORE IMUThreadSem;
 
         comm = *reinterpret_cast<comm_chassis_t*>(CommMsg);
 
-        if (remoter.ctrl_sw == Normal && tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) == TX_SUCCESS)
+        if (remoter.ctrl_sw == Normal 
+            && !remoter.offline
+            && tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) == TX_SUCCESS)
             cmd.ifmove = true;
         else
             cmd.ifmove = false;
@@ -88,7 +90,7 @@ extern TX_SEMAPHORE IMUThreadSem;
         //     cmd.auto_aim = false;
         cmd.auto_aim = true;
 
-        if (remoter.key.SHIFT)
+        if (remoter.key.SHIFT || remoter.last_ctrl_sw == Spin)
             cmd.ifspin = true;
         else
             cmd.ifspin = false;

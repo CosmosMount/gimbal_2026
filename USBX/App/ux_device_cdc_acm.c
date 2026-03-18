@@ -184,7 +184,7 @@ VOID USBD_CDC_ACM_ParameterChange(VOID *cdc_acm_instance)
 uint32_t new_data_ = 0;
 
 struct msg_visionrx_t msg_visionrx;
-struct msg_visionrx_t debug_visionrx;
+struct msg_visionrx_t debug_vrx;
 /**
   * @brief  Function implementing USBX_DEVICE_CDC_ACM_Read_TASK.
   * @param  thread_input: Not used.
@@ -213,7 +213,7 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
         tx_semaphore_put(&VisionRxSem);
         memcpy(&msg_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
       }
-      memcpy(&debug_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
+      memcpy(&debug_vrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
     }
     om_publish(visionrx_topic, &msg_visionrx, sizeof(msg_visionrx), true, false);
     msg_visionrx.header = 0;
