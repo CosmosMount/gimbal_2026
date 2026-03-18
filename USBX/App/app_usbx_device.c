@@ -24,6 +24,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "app_usbx_device.h"
+#include "tx_api.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -60,7 +61,7 @@ static TX_THREAD ux_cdc_write_thread;
 /* Private function prototypes -----------------------------------------------*/
 static VOID app_ux_device_thread_entry(ULONG thread_input);
 /* USER CODE BEGIN PFP */
-
+extern TX_SEMAPHORE VisionRxSem;
 /* USER CODE END PFP */
 
 /**
@@ -83,7 +84,7 @@ UINT MX_USBX_Device_Init(VOID *memory_ptr)
   TX_BYTE_POOL *byte_pool = (TX_BYTE_POOL*)memory_ptr;
 
   /* USER CODE BEGIN MX_USBX_Device_Init0 */
-
+  tx_semaphore_create(&VisionRxSem, "VisionRxSem", 0);
   /* USER CODE END MX_USBX_Device_Init0 */
 
   /* Allocate the stack for USBX Memory */
@@ -190,7 +191,7 @@ UINT MX_USBX_Device_Init(VOID *memory_ptr)
   /* Create the usbx cdc acm read thread */
   if (tx_thread_create(&ux_cdc_read_thread, "cdc_acm_read_usbx_app_thread_entry",
                        usbx_cdc_acm_read_thread_entry, 1, pointer,
-                       UX_DEVICE_APP_THREAD_STACK_SIZE, 20, 20, TX_NO_TIME_SLICE,
+                       UX_DEVICE_APP_THREAD_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE,
                        TX_AUTO_START) != TX_SUCCESS)
   {
     return TX_THREAD_ERROR;
@@ -205,7 +206,7 @@ UINT MX_USBX_Device_Init(VOID *memory_ptr)
   /* Create the usbx_cdc_acm_write_thread_entry thread */
   if (tx_thread_create(&ux_cdc_write_thread, "cdc_acm_write_usbx_app_thread_entry",
                        usbx_cdc_acm_write_thread_entry, 1, pointer,
-                       UX_DEVICE_APP_THREAD_STACK_SIZE, 20, 20, TX_NO_TIME_SLICE,
+                       UX_DEVICE_APP_THREAD_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE,
                        TX_AUTO_START) != TX_SUCCESS)
   {
     return TX_THREAD_ERROR;

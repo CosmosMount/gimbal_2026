@@ -55,7 +55,7 @@
             "request": "launch",
             "servertype": "openocd",
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/build/Debug/RM26_H7.elf",
+            "executable": "${workspaceFolder}/build/Debug/wbr_gimbal.elf",
             "configFiles": [
                 "interface/cmsis-dap.cfg",
                 "target/stm32h7x.cfg"
@@ -75,7 +75,7 @@
             "request": "launch",
             "servertype": "openocd",
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/build/Debug/RM26_H7.elf",
+            "executable": "${workspaceFolder}/build/Debug/wbr_gimbal.elf",
             "configFiles": [
                 "interface/stlink.cfg",
                 "target/stm32h7x.cfg"

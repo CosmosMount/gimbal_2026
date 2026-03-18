@@ -30,6 +30,7 @@
 #include "om.h"
 #include "crc.hpp"
 #include "magicmsgs.hpp"
+#include "tx_api.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,7 +45,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+TX_SEMAPHORE VisionRxSem;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -197,7 +198,6 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
   UX_PARAMETER_NOT_USED(thread_input);
 
   om_topic_t *visionrx_topic = om_config_topic(NULL, "ca", "visionrx", sizeof(msg_visionrx));
-  // tx_thread_sleep(TX_WAIT_FOREVER);
   while (1)
   {
     if ((device->ux_slave_device_state == UX_DEVICE_CONFIGURED) && (cdc_acm != UX_NULL))
@@ -209,6 +209,8 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
 
       if (actual_length >= sizeof(msg_visionrx))
       {
+        tx_semaphore_put(&VisionRxSem);
+        tx_semaphore_put(&VisionRxSem);
         memcpy(&msg_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
       }
       memcpy(&debug_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
