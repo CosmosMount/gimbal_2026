@@ -194,6 +194,7 @@ static float sin_signal(float t, float T, float amplitude)
     bool maintained_pitch = false;
     float yaw_maintain = 0.0f;
     float pitch_maintain = 0.0f;
+    float delta_yaw = 0.0f;
 
 #ifdef NONVISION
     constexpr float yaw_signal_T = 0.5f;
@@ -210,7 +211,8 @@ static float sin_signal(float t, float T, float amplitude)
         om_suber_export(cmd_suber, &cmd, false);
         om_suber_export(comm_suber, &comm, false);
 
-        if (Verify_CRC16_Check_Sum(reinterpret_cast<uint8_t*>(&vision_rx), sizeof(msg_visionrx_t)))
+        if (Verify_CRC16_Check_Sum(reinterpret_cast<uint8_t*>(&vision_rx), sizeof(msg_visionrx_t))
+             && vision_rx.header == 0xA5)
         {
             if (isnan(vision_rx.yaw) || isnan(vision_rx.yaw_vel) || isnan(vision_rx.yaw_acc) ||
                 isnan(vision_rx.pitch) || isnan(vision_rx.pitch_vel) || isnan(vision_rx.pitch_acc))
@@ -224,6 +226,17 @@ static float sin_signal(float t, float T, float amplitude)
                 memcpy(&prev_vision_rx, &vision_rx, sizeof(msg_visionrx_t));
             }
         }
+        else 
+        {
+            valid_vision_rx = false;
+            memcpy(&vision_rx, &prev_vision_rx, sizeof(msg_visionrx_t));
+        }
+
+        if ((int)DWT_GetTimeline_ms() % 100 == 0)
+        {
+            memset(&prev_vision_rx, 0, sizeof(msg_visionrx_t));
+            vision_rx.header = 0;
+        } 
 
         if (!cmd.ifmove || tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) != TX_SUCCESS)
             gimbal_state = RELAX;
@@ -255,20 +268,37 @@ static float sin_signal(float t, float T, float amplitude)
                 break;
             }
 
+            maintained_yaw = false;
+
+            delta_yaw = vision_rx.yaw - ins.yaw*DegreeToRad;
+            if (delta_yaw > Numeric::Pi)
+                delta_yaw -= 2.0f*Numeric::Pi;
+            else if (delta_yaw < -Numeric::Pi)
+                delta_yaw += 2.0f*Numeric::Pi;
+
+            if (delta_yaw > 0.5f*Numeric::Pi || delta_yaw < -0.5f*Numeric::Pi)
+            {
+                gimbal_state = MANUALAIM;
+                break;
+            }
+
             yaw_pos_pid.ref = vision_rx.yaw;
             pitch_pos_pid.ref = vision_rx.pitch;
-            yaw_spd_pid.ref = vision_rx.yaw_vel;
-            pitch_spd_pid.ref = vision_rx.pitch_vel;
-            yaw_spd_pid.fdb = ins.gyro_y;
-            pitch_spd_pid.fdb = ins.gyro_p;
-            yaw_pos_pid.fdb = ins.total_yaw;
-            yaw_spd_pid.fdb = ins.gyro_y;
-            pitch_pos_pid.fdb = ins.pitch;
-            pitch_spd_pid.fdb = ins.gyro_p;
+
+            yaw_pos_pid.fdb = ins.total_yaw*DegreeToRad;
             yaw_pos_pid.UpdateResult();
+            yaw_spd_pid.ref = yaw_pos_pid.result;
+            yaw_spd_pid.fdb = ins.gyro_y;
+            yaw_spd_pid.UpdateResult();
+
+            pitch_pos_pid.fdb = ins.pitch*DegreeToRad;
             pitch_pos_pid.UpdateResult();
-            motor.yaw_cur = static_cast<uint16_t>(-yaw_spd_pid.result * Tk_6020);
-            pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result * Tk_6020);
+            pitch_spd_pid.ref = pitch_pos_pid.result;
+            pitch_spd_pid.fdb = ins.gyro_p;
+            pitch_spd_pid.UpdateResult();
+            motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
+            pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020-3500*arm_cos_f32(ins.pitch*DegreeToRad));
+
             break;
 
         case MANUALAIM:
@@ -341,7 +371,7 @@ static float sin_signal(float t, float T, float amplitude)
                 pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020-3500*arm_cos_f32(ins.pitch*DegreeToRad));
             }
 
-            if (cmd.auto_aim)
+            if (cmd.auto_aim || valid_vision_rx)
             {
                 gimbal_state = AUTOAIM;
             }

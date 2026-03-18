@@ -7,11 +7,11 @@
         "command": "openocd",
         "args": [
             "-f",
-            "interface/cmsis-dap.cfg",//stlink.cfg",//
+            "interface/stlink.cfg",//"interface/cmsis-dap.cfg",//
             "-f",
             "target/stm32h7x.cfg",
             "-c",
-            "program build/Debug/wbr_gimbal.elf reset exit"
+            "program build/Debug/RM26_H7.elf reset exit"
         ],
         "problemMatcher": []
     }
