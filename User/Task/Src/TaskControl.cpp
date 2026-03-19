@@ -48,9 +48,9 @@ typedef struct
     float kd;
 } pid_tuning_t;
 
-pid_tuning_t yaw_pos_tuning = {120.0f, 0.0f, 0.0f};
-pid_tuning_t yaw_spd_tuning = {10.0f, 0.0f, 10.0f};
-pid_tuning_t pitch_pos_tuning = {50.0f, 0.0f, 0.0f};
+pid_tuning_t yaw_pos_tuning = {60.0f, 0.0f, 600.0f};
+pid_tuning_t yaw_spd_tuning = {200.0f, 0.0f, 2000.0f};
+pid_tuning_t pitch_pos_tuning = {50.0f, 0.3f, 0.0f};
 pid_tuning_t pitch_spd_tuning = {100.0f, 0.0f,0.0f};
 
 // pid_tuning_t yaw_pos_manual_pid = {50.0f, 0.0f};
@@ -160,13 +160,11 @@ static float sin_signal(float t, float T, float amplitude)
     DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x202);
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x201);
 
-    PID yaw_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 10.0f, PID_POSITION | PID_Derivative_On_Measurement | PID_Integral_Limit);
-    PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 500.0f, 100.0f, PID_POSITION);
+    PID yaw_pos_pid(200.0f, 0.0f, 0.0f, 25000.0f, 100.0f, PID_POSITION | PID_Derivative_On_Measurement | PID_Integral_Limit);
+    PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 25000.0f, 100.0f, PID_POSITION);
 
-    PID pitch_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 50.0f, PID_POSITION | PID_Derivative_On_Measurement | PID_Integral_Limit);
-    PID pitch_spd_pid(200.0f, 0.0f, 1000.0f, 500.0f, 50.0f, PID_POSITION | PID_Derivative_On_Measurement);
-
-    constexpr float Tk_6020 = 50.0f;
+    PID pitch_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 500.0f, PID_POSITION | PID_Derivative_On_Measurement | PID_Integral_Limit);
+    PID pitch_spd_pid(200.0f, 0.0f, 1000.0f, 500.0f, 500.0f, PID_POSITION | PID_Derivative_On_Measurement);
 
     constexpr float BulletFreq[10][3] = {
         {3.5*0.78f, 4*0.78f, 5*0.78f},
@@ -222,8 +220,8 @@ static float sin_signal(float t, float T, float amplitude)
     uint16_t aim_lost_cnt = 0;
 
 #ifdef NONVISION
-    constexpr float yaw_signal_T = 0.3f;
-    constexpr float yaw_signal_step = 0.12f;
+    constexpr float yaw_signal_T = 0.4f;
+    constexpr float yaw_signal_step = 0.18f;
     constexpr float pitch_signal_T = 0.2f;
     constexpr float pitch_signal_step = 0.012f;
     float yaw_init = 0.0f;
@@ -288,13 +286,13 @@ static float sin_signal(float t, float T, float amplitude)
         }
         else 
         {
-            valid_vision_rx = false;`
         #ifdef NONVISION
-            pitch_pos_pid.ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
+            // pitch_pos_pid.ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
+            pitch_pos_pid.ref = ins.pitch*DegreeToRad;
             pitch_pos_pid.fdb = ins.pitch*DegreeToRad;
             if (yaw_init == 0.0f)
                 yaw_init = ins.total_yaw*DegreeToRad;
-            yaw_pos_pid.ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+            yaw_pos_pid.ref = yaw_init + signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
             yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
         #else
             if (valid_vision_rx)
@@ -322,14 +320,14 @@ static float sin_signal(float t, float T, float amplitude)
             yaw_spd_pid.ref = yaw_pos_pid.result;
             yaw_spd_pid.fdb = ins.gyro_y;
             yaw_spd_pid.UpdateResult();
-            motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*50.0f-yaw_comp_tuning);
+            motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result);
 
             pitch_pos_pid.fdb = ins.pitch*DegreeToRad;
             pitch_pos_pid.UpdateResult();
             pitch_spd_pid.ref = pitch_pos_pid.result;
             pitch_spd_pid.fdb = ins.gyro_p;
             pitch_spd_pid.UpdateResult();
-            pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+5000.0f*arm_cos_f32(ins.pitch*DegreeToRad));
+            pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3000.0f*arm_cos_f32(ins.pitch*DegreeToRad));
         }
 
         if (cmd.shoot)
@@ -343,7 +341,7 @@ static float sin_signal(float t, float T, float amplitude)
             && fabs(pitch_pos_pid.ref-pitch_pos_pid.fdb)<0.004f 
             && vision_rx.fire))
             {
-                motor.tri_spd = 4;
+                motor.tri_spd = 5;
             }
             else
             {
