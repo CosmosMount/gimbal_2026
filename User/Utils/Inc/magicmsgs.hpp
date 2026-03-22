@@ -4,7 +4,8 @@
 extern "C" {
 #endif
 
-typedef enum {
+typedef enum 
+{
     Relax = 2,
     Spin = 1,
     Normal = 3,
@@ -145,9 +146,9 @@ struct msg_visionrx_t
     uint8_t reserved : 2; // 保留位
 
     float pitch;
+    float yaw;
     float pitch_vel;
     float pitch_acc;
-    float yaw;
     float yaw_vel;
     float yaw_acc;
 

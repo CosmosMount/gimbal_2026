@@ -44,19 +44,12 @@ typedef struct
     float kp;
     float kd;
 } pid_tuning_t;
+
 pid_tuning_t yaw_pos_tuning = {50.0f, 0.0f};
 pid_tuning_t yaw_spd_tuning = {10.0f, 10.0f};
 pid_tuning_t pitch_pos_tuning = {50.0f, 0.0f};
 pid_tuning_t pitch_spd_tuning = {100.0f, 50.0f};
 
-// pid_tuning_t yaw_pos_manual_pid = {50.0f, 0.0f};
-// pid_tuning_t yaw_spd_manual_pid = {10.0f, 50.0f};
-// pid_tuning_t pitch_pos_manual_pid = {50.0f, 0.0f};
-// pid_tuning_t pitch_spd_manual_pid = {100.0f, 50.0f};
-// pid_tuning_t yaw_pos_auto_pid = {65.0f, 10.0f};
-// pid_tuning_t yaw_spd_auto_pid = {15.0f, 50.0f};
-// pid_tuning_t pitch_pos_auto_pid = {110.0f, 30.0f};
-// pid_tuning_t pitch_spd_auto_pid = {300.0f, 200.0f};
 float pitch_comp_tuning=3.5f;
 struct gimbal_debug_t
 {
