@@ -250,134 +250,57 @@ static float sin_signal(float t, float T, float amplitude)
         
         switch (gimbal_state) 
         {
-        case RELAX:
-            inited  = false;
-            motor.yaw_cur = 0;
-            pitch_motor.currentSet = 0;
-            yaw_maintain = ins.total_yaw*DegreeToRad;
-            pitch_maintain = ins.pitch*DegreeToRad;
-            maintained_yaw = false;
-            maintained_pitch = false;
-        #ifdef NONVISION
-            yaw_init = 0.0f;
-        #endif
-            if (cmd.ifmove)
+            case RELAX:
             {
-                gimbal_state = MANUALAIM;
-            }
-            break;
-
-        case AUTOAIM:
-            maintained_yaw = false;
-
-            delta_yaw = vision_yaw_filter.Update(vision_rx.yaw) - ins.yaw*DegreeToRad;
-            if (delta_yaw > Numeric::Pi)
-                delta_yaw -= 2.0f*Numeric::Pi;
-            else if (delta_yaw < -Numeric::Pi)
-                delta_yaw += 2.0f*Numeric::Pi;
-
-            if (delta_yaw > 0.5f*Numeric::Pi || delta_yaw < -0.5f*Numeric::Pi)
-            {
-                delta_yaw = 0.0f;
-            }
-
-            if (tx_semaphore_get(&VisionRxSem, TX_NO_WAIT) != TX_SUCCESS)
-            {
-                aim_lost_cnt++;
-                if (aim_lost_cnt > 100)
+                inited  = false;
+                motor.yaw_cur = 0;
+                pitch_motor.currentSet = 0;
+                yaw_maintain = ins.total_yaw*DegreeToRad;
+                pitch_maintain = ins.pitch*DegreeToRad;
+                maintained_yaw = false;
+                maintained_pitch = false;
+            #ifdef NONVISION
+                yaw_init = 0.0f;
+            #endif
+                if (cmd.ifmove)
                 {
                     gimbal_state = MANUALAIM;
-                    valid_vision_rx = false;
-                    memset(&vision_rx, 0, sizeof(msg_visionrx_t));
-                    memset(&prev_vision_rx, 0, sizeof(msg_visionrx_t));
-                    aim_lost_cnt = 0;
-                    break;
                 }
+                break;
             }
 
-            yaw_pos_pid.ref = ins.total_yaw*DegreeToRad + delta_yaw;
-            pitch_pos_pid.ref = -vision_pitch_filter.Update(vision_rx.pitch);
-
-            yaw_pos_pid.fdb = ins.total_yaw*DegreeToRad;
-            yaw_pos_pid.UpdateResult();
-            yaw_spd_pid.ref = yaw_pos_pid.result;
-            yaw_spd_pid.fdb = ins.gyro_y;
-            yaw_spd_pid.UpdateResult();
-
-            pitch_pos_pid.fdb = ins.pitch*DegreeToRad;
-            pitch_pos_pid.UpdateResult();
-            pitch_spd_pid.ref = pitch_pos_pid.result;
-            pitch_spd_pid.fdb = ins.gyro_p;
-            pitch_spd_pid.UpdateResult();
-            motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
-            pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
-
-            break;
-
-        case MANUALAIM:
-
-            // yaw_pos_pid.kp = yaw_pos_manual_pid.kp;
-            // yaw_pos_pid.kd = yaw_pos_manual_pid.kd;
-            // yaw_spd_pid.kp = yaw_spd_manual_pid.kp;
-            // yaw_spd_pid.kd = yaw_spd_manual_pid.kd;
-            // pitch_pos_pid.kp = pitch_pos_manual_pid.kp;
-            // pitch_pos_pid.kd = pitch_pos_manual_pid.kd;
-            // pitch_spd_pid.kp = pitch_spd_manual_pid.kp;
-            // pitch_spd_pid.kd = pitch_spd_manual_pid.kd;
-
-            if (!inited)
+            case AUTOAIM:
             {
-                yaw_pos_pid.ref  = ins.total_yaw * DegreeToRad;
-                pitch_pos_pid.ref = ins.pitch * DegreeToRad;
-                pitch_motor.currentSet = ins.pitch > 0.0f ? -11500 : 11500;
-                if (fabs(ins.pitch) < 5.0f)
+                maintained_yaw = false;
+
+                delta_yaw = vision_yaw_filter.Update(vision_rx.yaw) - ins.yaw*DegreeToRad;
+                if (delta_yaw > Numeric::Pi)
+                    delta_yaw -= 2.0f*Numeric::Pi;
+                else if (delta_yaw < -Numeric::Pi)
+                    delta_yaw += 2.0f*Numeric::Pi;
+
+                if (delta_yaw > 0.5f*Numeric::Pi || delta_yaw < -0.5f*Numeric::Pi)
                 {
-                    pitch_motor.currentSet = 3500;
-                    if (comm.inited)
-                        inited = true;
+                    delta_yaw = 0.0f;
                 }
-            }
-            else 
-            {
-            #ifdef NONVISION
-                // pitch_mit.pos_ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
-                pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
-                if (yaw_init == 0.0f)
-                    yaw_init = ins.total_yaw*DegreeToRad;
-                yaw_pos_pid.ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
-                yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
-            #else
-                if (fabs(cmd.dpitch)<0.005f)
+
+                if (tx_semaphore_get(&VisionRxSem, TX_NO_WAIT) != TX_SUCCESS)
                 {
-                    if (!maintained_pitch)
+                    aim_lost_cnt++;
+                    if (aim_lost_cnt > 100)
                     {
-                        pitch_maintain = ins.pitch*DegreeToRad;
-                        maintained_pitch = true;
+                        gimbal_state = MANUALAIM;
+                        valid_vision_rx = false;
+                        memset(&vision_rx, 0, sizeof(msg_visionrx_t));
+                        memset(&prev_vision_rx, 0, sizeof(msg_visionrx_t));
+                        aim_lost_cnt = 0;
+                        break;
                     }
-                    pitch_pos_pid.ref = pitch_maintain;
                 }
-                else
-                {
-                    maintained_pitch = false;
-                    pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.65f, 0.45f);
-                }
-                
-                if (fabs(cmd.dyaw)<0.005f)
-                {
-                    if (!maintained_yaw)
-                    {
-                        yaw_maintain = ins.total_yaw*DegreeToRad;
-                        maintained_yaw = true;
-                    }
-                    yaw_pos_pid.ref = yaw_maintain;
-                }
-                else
-                {
-                    maintained_yaw = false;
-                    yaw_pos_pid.ref = ins.total_yaw*DegreeToRad-cmd.dyaw*0.05f;
-                }
-                
-            #endif
+
+                yaw_pos_pid.ref = ins.total_yaw*DegreeToRad + delta_yaw;
+                pitch_pos_pid.ref = -vision_pitch_filter.Update(vision_rx.pitch);
+
                 yaw_pos_pid.fdb = ins.total_yaw*DegreeToRad;
                 yaw_pos_pid.UpdateResult();
                 yaw_spd_pid.ref = yaw_pos_pid.result;
@@ -391,69 +314,155 @@ static float sin_signal(float t, float T, float amplitude)
                 pitch_spd_pid.UpdateResult();
                 motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
                 pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
+
+                break;
             }
 
-            if (valid_vision_rx)
+            case MANUALAIM:
             {
-                gimbal_state = AUTOAIM;
+                // yaw_pos_pid.kp = yaw_pos_manual_pid.kp;
+                // yaw_pos_pid.kd = yaw_pos_manual_pid.kd;
+                // yaw_spd_pid.kp = yaw_spd_manual_pid.kp;
+                // yaw_spd_pid.kd = yaw_spd_manual_pid.kd;
+                // pitch_pos_pid.kp = pitch_pos_manual_pid.kp;
+                // pitch_pos_pid.kd = pitch_pos_manual_pid.kd;
+                // pitch_spd_pid.kp = pitch_spd_manual_pid.kp;
+                // pitch_spd_pid.kd = pitch_spd_manual_pid.kd;
+
+                if (!inited)
+                {
+                    yaw_pos_pid.ref  = ins.total_yaw * DegreeToRad;
+                    pitch_pos_pid.ref = ins.pitch * DegreeToRad;
+                    pitch_motor.currentSet = ins.pitch > 0.0f ? -11500 : 11500;
+                    if (fabs(ins.pitch) < 5.0f)
+                    {
+                        pitch_motor.currentSet = 3500;
+                        if (comm.inited)
+                            inited = true;
+                    }
+                }
+                else 
+                {
+                #ifdef NONVISION
+                    // pitch_mit.pos_ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
+                    pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
+                    if (yaw_init == 0.0f)
+                        yaw_init = ins.total_yaw*DegreeToRad;
+                    yaw_pos_pid.ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+                    yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+                #else
+                    if (fabs(cmd.dpitch)<0.005f)
+                    {
+                        if (!maintained_pitch)
+                        {
+                            pitch_maintain = ins.pitch*DegreeToRad;
+                            maintained_pitch = true;
+                        }
+                        pitch_pos_pid.ref = pitch_maintain;
+                    }
+                    else
+                    {
+                        maintained_pitch = false;
+                        pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.65f, 0.45f);
+                    }
+                    
+                    if (fabs(cmd.dyaw)<0.005f)
+                    {
+                        if (!maintained_yaw)
+                        {
+                            yaw_maintain = ins.total_yaw*DegreeToRad;
+                            maintained_yaw = true;
+                        }
+                        yaw_pos_pid.ref = yaw_maintain;
+                    }
+                    else
+                    {
+                        maintained_yaw = false;
+                        yaw_pos_pid.ref = ins.total_yaw*DegreeToRad-cmd.dyaw*0.05f;
+                    }
+                    
+                #endif
+                    yaw_pos_pid.fdb = ins.total_yaw*DegreeToRad;
+                    yaw_pos_pid.UpdateResult();
+                    yaw_spd_pid.ref = yaw_pos_pid.result;
+                    yaw_spd_pid.fdb = ins.gyro_y;
+                    yaw_spd_pid.UpdateResult();
+
+                    pitch_pos_pid.fdb = ins.pitch*DegreeToRad;
+                    pitch_pos_pid.UpdateResult();
+                    pitch_spd_pid.ref = pitch_pos_pid.result;
+                    pitch_spd_pid.fdb = ins.gyro_p;
+                    pitch_spd_pid.UpdateResult();
+                    motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
+                    pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
+                }
+
+                if (valid_vision_rx)
+                {
+                    gimbal_state = AUTOAIM;
+                }
+
+                break;
             }
-
-            break;
         }
 
-        if (!cmd.shoot)
-        {
-            shooter_state = CLOSED;
-        }
+            if (!cmd.shoot)
+            {
+                shooter_state = CLOSED;
+            }
 
         switch (shooter_state)
         {
-        case CLOSED:
-            Lfric.currentSet = 0;
-            Rfric.currentSet = 0;
-            motor.tri_spd = 0;
-            if (cmd.shoot)
-                shooter_state = SHOOT;
-            break;
-
-        case SHOOT:
-            Lfric.speedSet = 660;
-            Rfric.speedSet = -660;
-            if (((yaw_pos_pid.ref-yaw_pos_pid.fdb)<0.01f 
-                && (pitch_pos_pid.ref-pitch_pos_pid.fdb)<0.002f 
-                && vision_rx.fire)
-                || cmd.fire)
+            case CLOSED:
             {
-                switch (cmd.shooter_type)
-                {
-                case SINGLE:
-                    motor.tri_spd = 6;
-                    break;
-                case NORMAL:
-                    // motor.tri_spd = BulletFreq[comm.level-1][1];
-                    // if (comm.heat_now >= comm.heat_limit*0.75f)
-                    //     motor.tri_spd = BulletFreq[comm.level-1][0];
-                    // if (comm.heat_now >= comm.heat_limit*0.85f)
-                    //     motor.tri_spd = 0;
-                    motor.tri_spd = 4;
-                    break;
-                case BURST:
-                    motor.tri_spd = BulletFreq[comm.level-1][2];
-                    if (comm.heatnow >= comm.heatlimit*0.75f)
-                        motor.tri_spd = BulletFreq[comm.level-1][0];
-                    if (comm.heatnow >= comm.heatlimit*0.85f)
-                        motor.tri_spd = 0;
-                    break;
-                }
-            }
-            else
-            {
+                Lfric.currentSet = 0;
+                Rfric.currentSet = 0;
                 motor.tri_spd = 0;
+                if (cmd.shoot)
+                    shooter_state = SHOOT;
+                break;
             }
 
-            Lfric.setOutput();
-            Rfric.setOutput();
-            break;
+            case SHOOT:
+            {
+                Lfric.speedSet = 660;
+                Rfric.speedSet = -660;
+                if (((yaw_pos_pid.ref-yaw_pos_pid.fdb)<0.01f 
+                    && (pitch_pos_pid.ref-pitch_pos_pid.fdb)<0.002f 
+                    && vision_rx.fire)
+                    || cmd.fire)
+                {
+                    switch (cmd.shooter_type)
+                    {
+                    case SINGLE:
+                        motor.tri_spd = 6;
+                        break;
+                    case NORMAL:
+                        // motor.tri_spd = BulletFreq[comm.level-1][1];
+                        // if (comm.heat_now >= comm.heat_limit*0.75f)
+                        //     motor.tri_spd = BulletFreq[comm.level-1][0];
+                        // if (comm.heat_now >= comm.heat_limit*0.85f)
+                        //     motor.tri_spd = 0;
+                        motor.tri_spd = 4;
+                        break;
+                    case BURST:
+                        motor.tri_spd = BulletFreq[comm.level-1][2];
+                        if (comm.heatnow >= comm.heatlimit*0.75f)
+                            motor.tri_spd = BulletFreq[comm.level-1][0];
+                        if (comm.heatnow >= comm.heatlimit*0.85f)
+                            motor.tri_spd = 0;
+                        break;
+                    }
+                }
+                else
+                {
+                    motor.tri_spd = 0;
+                }
+
+                Lfric.setOutput();
+                Rfric.setOutput();
+                break;
+            }
         }
         DJIMotorHandler::Instance()->sendControlData();
         om_publish(motor_topic, &motor, sizeof(msg_motor_t), true, false);
