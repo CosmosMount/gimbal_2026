@@ -37,6 +37,7 @@ typedef struct
     float lfric_cur;
     float rfric_spd;
     float rfric_cur;
+    int16_t yaw_cur;
 } debug_motor_t;
 debug_motor_t debug_motor;
 typedef struct
@@ -45,12 +46,15 @@ typedef struct
     float kd;
 } pid_tuning_t;
 
-pid_tuning_t yaw_pos_tuning = {50.0f, 0.0f};
-pid_tuning_t yaw_spd_tuning = {10.0f, 10.0f};
-pid_tuning_t pitch_pos_tuning = {50.0f, 0.0f};
-pid_tuning_t pitch_spd_tuning = {100.0f, 50.0f};
+pid_tuning_t yaw_pos_tuning = {160.0f, 0.0f};
+pid_tuning_t yaw_spd_tuning = {320.0f, 5000.0f};
+pid_tuning_t pitch_pos_tuning = {140.0f, 0.0f};
+pid_tuning_t pitch_spd_tuning = {100.0f, 1000.0f};
 
-float pitch_comp_tuning=3.5f;
+float pitch_comp_tuning=1.0f;
+float yaw_comp_tuning=1.0f;
+
+
 struct gimbal_debug_t
 {
     float pos_set;
@@ -212,8 +216,8 @@ static float sin_signal(float t, float T, float amplitude)
 #ifdef NONVISION
     constexpr float yaw_signal_T = 0.5f;
     constexpr float yaw_signal_step = 0.12f;
-    constexpr float pitch_signal_T = 0.2f;
-    constexpr float pitch_signal_step = 0.012f;
+    constexpr float pitch_signal_T = 0.4f;
+    constexpr float pitch_signal_step = 0.02f;
     float yaw_init = 0.0f;
 #endif
 
@@ -312,7 +316,7 @@ static float sin_signal(float t, float T, float amplitude)
                 pitch_spd_pid.ref = pitch_pos_pid.result;
                 pitch_spd_pid.fdb = ins.gyro_p;
                 pitch_spd_pid.UpdateResult();
-                motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
+                motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result);//0;//
                 pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
 
                 break;
@@ -348,8 +352,10 @@ static float sin_signal(float t, float T, float amplitude)
                     pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
                     if (yaw_init == 0.0f)
                         yaw_init = ins.total_yaw*DegreeToRad;
-                    yaw_pos_pid.ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
-                    yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+                    yaw_pos_pid.ref = yaw_init + signal(DWT_GetTimeline_s(), 0.5f, 0.21f);
+                    // yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+                    // pitch_pos_pid.ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
+                    // yaw_pos_pid.ref = ins.total_yaw*DegreeToRad-cmd.dyaw*0.05f;
                 #else
                     if (fabs(cmd.dpitch)<0.005f)
                     {
@@ -363,7 +369,7 @@ static float sin_signal(float t, float T, float amplitude)
                     else
                     {
                         maintained_pitch = false;
-                        pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.65f, 0.45f);
+                        pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);//sin_signal(DWT_GetTimeline_s(),pitch_signal_T,pitch_signal_step);//
                     }
                     
                     if (fabs(cmd.dyaw)<0.005f)
@@ -393,8 +399,8 @@ static float sin_signal(float t, float T, float amplitude)
                     pitch_spd_pid.ref = pitch_pos_pid.result;
                     pitch_spd_pid.fdb = ins.gyro_p;
                     pitch_spd_pid.UpdateResult();
-                    motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
-                    pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
+                    motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result);//0;//
+                    pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3500*arm_cos_f32(ins.pitch*DegreeToRad)*0.5f);
                 }
 
                 if (valid_vision_rx)
@@ -468,7 +474,7 @@ static float sin_signal(float t, float T, float amplitude)
         om_publish(motor_topic, &motor, sizeof(msg_motor_t), true, false);
     #ifdef DEBUG
         debug_ins = ins;
-        
+        debug_motor.yaw_cur = motor.yaw_cur;
         debug_motor.pitchmotor_spd = pitch_motor.motorFeedback.speedFdb;
         debug_motor.pitchmotor_cur = pitch_motor.motorFeedback.currentFdb;
         debug_motor.lfric_spd = Lfric.motorFeedback.speedFdb;
