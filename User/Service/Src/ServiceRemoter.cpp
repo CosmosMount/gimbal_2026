@@ -64,11 +64,11 @@ inline dr16_data_t& Dr16_Data()
         msg_remoter.left_y = (static_cast<float>(Dr16_Data().ch_3) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
 
         // 鼠标
-        msg_remoter.mouse_x  = static_cast<float>(Dr16_Data().mouse_x / MOUSE_OFFSET_MAX);
-        msg_remoter.mouse_y  = static_cast<float>(Dr16_Data().mouse_y / MOUSE_OFFSET_MAX);
+        msg_remoter.mouse_x  = static_cast<float>(Dr16_Data().mouse_x);
+        msg_remoter.mouse_y  = static_cast<float>(Dr16_Data().mouse_y);
         msg_remoter.mouse_z  = static_cast<float>(Dr16_Data().mouse_z);
-        msg_remoter.mouse_left  = Dr16_Data().mouse_left != 0;
-        msg_remoter.mouse_right = Dr16_Data().mouse_right != 0;
+        msg_remoter.mouse_left  = (Dr16_Data().mouse_left != 0);
+        msg_remoter.mouse_right = (Dr16_Data().mouse_right != 0);
 
         // 键盘位域可以直接 memcpy
         memcpy(&msg_remoter.key, &Dr16_Data().key, sizeof(msg_remoter.key));

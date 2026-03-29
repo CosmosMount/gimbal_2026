@@ -37,6 +37,7 @@ typedef struct
     float lfric_cur;
     float rfric_spd;
     float rfric_cur;
+    int16_t yaw_cur;
 } debug_motor_t;
 debug_motor_t debug_motor;
 typedef struct
@@ -45,10 +46,10 @@ typedef struct
     float kd;
 } pid_tuning_t;
 
-pid_tuning_t yaw_pos_tuning = {50.0f, 0.0f};
-pid_tuning_t yaw_spd_tuning = {10.0f, 10.0f};
-pid_tuning_t pitch_pos_tuning = {50.0f, 0.0f};
-pid_tuning_t pitch_spd_tuning = {100.0f, 50.0f};
+pid_tuning_t yaw_pos_tuning = {160.0f, 0.0f};
+pid_tuning_t yaw_spd_tuning = {320.0f, 2000.0f};
+pid_tuning_t pitch_pos_tuning = {140.0f, 0.0f};
+pid_tuning_t pitch_spd_tuning = {100.0f, 1000.0f};
 
 float pitch_comp_tuning=3.5f;
 struct gimbal_debug_t
@@ -64,7 +65,7 @@ msg_ins_t debug_ins;
 int16_t debug_yaw_cur;
 #endif
 
-// #define NONVISION
+#define NONVISION
 #ifdef NONVISION
 static float signal(float t, float T, float step_value)
 {
@@ -147,7 +148,7 @@ static float sin_signal(float t, float T, float amplitude)
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x201);
 
     PID yaw_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 10.0f, PID_POSITION | PID_Derivative_On_Measurement);
-    PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 500.0f, 100.0f, PID_POSITION);
+    PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 25000.0f, 100.0f, PID_POSITION);
 
     PID pitch_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 50.0f, PID_POSITION | PID_Derivative_On_Measurement);
     PID pitch_spd_pid(200.0f, 0.0f, 1000.0f, 500.0f, 50.0f, PID_POSITION | PID_Derivative_On_Measurement);
@@ -211,7 +212,7 @@ static float sin_signal(float t, float T, float amplitude)
 
 #ifdef NONVISION
     constexpr float yaw_signal_T = 0.5f;
-    constexpr float yaw_signal_step = 0.12f;
+    constexpr float yaw_signal_step = 0.21f;
     constexpr float pitch_signal_T = 0.2f;
     constexpr float pitch_signal_step = 0.012f;
     float yaw_init = 0.0f;
@@ -231,18 +232,15 @@ static float sin_signal(float t, float T, float amplitude)
                 isnan(vision_rx.pitch) || isnan(vision_rx.pitch_vel) || isnan(vision_rx.pitch_acc))
             {
                 valid_vision_rx = false;
-                memcpy(&vision_rx, &prev_vision_rx, sizeof(msg_visionrx_t));
             }
             else
             {
                 valid_vision_rx = true;
-                memcpy(&prev_vision_rx, &vision_rx, sizeof(msg_visionrx_t));
             }
         }
         else 
         {
             valid_vision_rx = false;
-            memcpy(&vision_rx, &prev_vision_rx, sizeof(msg_visionrx_t));
         }
 
         if (!cmd.ifmove || tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) != TX_SUCCESS)
@@ -273,17 +271,6 @@ static float sin_signal(float t, float T, float amplitude)
             {
                 maintained_yaw = false;
 
-                delta_yaw = vision_yaw_filter.Update(vision_rx.yaw) - ins.yaw*DegreeToRad;
-                if (delta_yaw > Numeric::Pi)
-                    delta_yaw -= 2.0f*Numeric::Pi;
-                else if (delta_yaw < -Numeric::Pi)
-                    delta_yaw += 2.0f*Numeric::Pi;
-
-                if (delta_yaw > 0.5f*Numeric::Pi || delta_yaw < -0.5f*Numeric::Pi)
-                {
-                    delta_yaw = 0.0f;
-                }
-
                 if (tx_semaphore_get(&VisionRxSem, TX_NO_WAIT) != TX_SUCCESS)
                 {
                     aim_lost_cnt++;
@@ -295,6 +282,27 @@ static float sin_signal(float t, float T, float amplitude)
                         memset(&prev_vision_rx, 0, sizeof(msg_visionrx_t));
                         aim_lost_cnt = 0;
                         break;
+                    }
+                }
+                else 
+                {
+                    if (valid_vision_rx)
+                    {
+                        aim_lost_cnt = 0;
+                        delta_yaw = vision_yaw_filter.Update(vision_rx.yaw) - ins.yaw*DegreeToRad;
+                        if (delta_yaw > Numeric::Pi)
+                            delta_yaw -= 2.0f*Numeric::Pi;
+                        else if (delta_yaw < -Numeric::Pi)
+                            delta_yaw += 2.0f*Numeric::Pi;
+
+                        // if (delta_yaw > 0.5f*Numeric::Pi || delta_yaw < -0.5f*Numeric::Pi)
+                        // {
+                        //     delta_yaw = 0.0f;
+                        // }
+                    }
+                    else
+                    {
+                        aim_lost_cnt++;                        
                     }
                 }
 
@@ -312,7 +320,7 @@ static float sin_signal(float t, float T, float amplitude)
                 pitch_spd_pid.ref = pitch_pos_pid.result;
                 pitch_spd_pid.fdb = ins.gyro_p;
                 pitch_spd_pid.UpdateResult();
-                motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
+                motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result);//0;//
                 pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
 
                 break;
@@ -348,8 +356,8 @@ static float sin_signal(float t, float T, float amplitude)
                     pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
                     if (yaw_init == 0.0f)
                         yaw_init = ins.total_yaw*DegreeToRad;
-                    yaw_pos_pid.ref = yaw_init + tri_signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
-                    yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+                    yaw_pos_pid.ref = yaw_init + signal(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
+                    // yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
                 #else
                     if (fabs(cmd.dpitch)<0.005f)
                     {
@@ -393,7 +401,7 @@ static float sin_signal(float t, float T, float amplitude)
                     pitch_spd_pid.ref = pitch_pos_pid.result;
                     pitch_spd_pid.fdb = ins.gyro_p;
                     pitch_spd_pid.UpdateResult();
-                    motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result*Tk_6020);//0;//
+                    motor.yaw_cur = static_cast<int16_t>(yaw_spd_pid.result);//0;//
                     pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
                 }
 
@@ -406,10 +414,10 @@ static float sin_signal(float t, float T, float amplitude)
             }
         }
 
-            if (!cmd.shoot)
-            {
-                shooter_state = CLOSED;
-            }
+        if (!cmd.shoot)
+        {
+            shooter_state = CLOSED;
+        }
 
         switch (shooter_state)
         {
@@ -432,6 +440,7 @@ static float sin_signal(float t, float T, float amplitude)
                     && vision_rx.fire)
                     || cmd.fire)
                 {
+                    motor.fire = 1;
                     switch (cmd.shooter_type)
                     {
                     case SINGLE:
@@ -456,6 +465,7 @@ static float sin_signal(float t, float T, float amplitude)
                 }
                 else
                 {
+                    motor.fire = 0;
                     motor.tri_spd = 0;
                 }
 
@@ -475,6 +485,7 @@ static float sin_signal(float t, float T, float amplitude)
         debug_motor.lfric_cur = Lfric.motorFeedback.currentFdb;
         debug_motor.rfric_spd = Rfric.motorFeedback.speedFdb;
         debug_motor.rfric_cur = Rfric.motorFeedback.currentFdb;
+        debug_motor.yaw_cur = motor.yaw_cur;
         yaw_pos_pid.kp = yaw_pos_tuning.kp;
         yaw_pos_pid.kd = yaw_pos_tuning.kd;
         yaw_spd_pid.kp = yaw_spd_tuning.kp;

@@ -43,4 +43,5 @@ struct msg_motor_t
 {
     uint16_t yaw_cur;
     uint16_t tri_spd;
+    uint8_t fire;
 };

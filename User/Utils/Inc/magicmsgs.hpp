@@ -155,6 +155,8 @@ struct msg_visionrx_t
     float project_x;
     float project_y;
 
+    float distance;
+
     uint16_t checksum; // 校验和
 }__attribute__((packed));
 

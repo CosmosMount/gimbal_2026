@@ -30,6 +30,7 @@
 #include "om.h"
 #include "crc.hpp"
 #include "magicmsgs.hpp"
+#include "config_comm.hpp"
 #include "tx_api.h"
 /* USER CODE END Includes */
 
@@ -184,7 +185,7 @@ VOID USBD_CDC_ACM_ParameterChange(VOID *cdc_acm_instance)
 uint32_t new_data_ = 0;
 
 struct msg_visionrx_t msg_visionrx;
-struct msg_visionrx_t debug_visionrx;
+struct msg_visionrx_t debug_vrx;
 /**
   * @brief  Function implementing USBX_DEVICE_CDC_ACM_Read_TASK.
   * @param  thread_input: Not used.
@@ -210,10 +211,9 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
       if (actual_length >= sizeof(msg_visionrx))
       {
         tx_semaphore_put(&VisionRxSem);
-        tx_semaphore_put(&VisionRxSem);
         memcpy(&msg_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
       }
-      memcpy(&debug_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
+      memcpy(&debug_vrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
     }
     om_publish(visionrx_topic, &msg_visionrx, sizeof(msg_visionrx), true, false);
     msg_visionrx.header = 0;
@@ -236,17 +236,20 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
   UX_SLAVE_DEVICE *device = &_ux_system_slave->ux_system_slave_device;
 
   om_suber_t *ins_suber = om_subscribe(om_find_topic("ins", UINT32_MAX));
+  om_suber_t *comm_suber = om_subscribe(om_find_topic("comm", UINT32_MAX));
   struct msg_ins_t ins;
+  struct comm_chassis_t comm;
   UX_PARAMETER_NOT_USED(thread_input);
   tx_thread_sleep(10);
   while (1)
   {
     om_suber_export(ins_suber, &ins, false);
-    
+    om_suber_export(comm_suber, &comm, false);
+
     if ((device->ux_slave_device_state == UX_DEVICE_CONFIGURED) && (cdc_acm != UX_NULL))
     {
       msg_visiontx.header = 0x5A;
-      msg_visiontx.detect_color = 0x00;
+      msg_visiontx.detect_color = 1-comm.color;
       msg_visiontx.reset_tracker = false;
       msg_visiontx.set_target = 0x00;
       msg_visiontx.q1 = ins.quaternion[0];
@@ -258,7 +261,7 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
       Append_CRC16_Check_Sum((uint8_t *)&msg_visiontx, sizeof(msg_visiontx));      
       memcpy(&debug_visiontx, &msg_visiontx, sizeof(msg_visiontx));
       ux_device_class_cdc_acm_write(cdc_acm, (UCHAR *)&msg_visiontx , sizeof(msg_visiontx) , &actual_length);
-      tx_thread_sleep(5);
+      tx_thread_sleep(2);
     }
   }
 }

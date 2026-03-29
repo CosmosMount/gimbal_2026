@@ -55,15 +55,17 @@ extern TX_SEMAPHORE IMUThreadSem;
         if ((remoter.ctrl_sw == Normal || remoter.ctrl_sw == Spin || remoter.ctrl_sw == N2S || remoter.ctrl_sw == S2N) 
             && tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) == TX_SUCCESS
             && !remoter.offline)
+        {
             cmd.ifmove = true;
+        }
         else
             cmd.ifmove = false;
 
         cmd_msg.vx = static_cast<int8_t>(((remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>(((remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f)+remoter.left_x)*10);
         cmd_msg.dlen = static_cast<int8_t>(((remoter.key.E ? 1.0f : 0.0f) - (remoter.key.Q ? 1.0f : 0.0f))*10);
-        cmd.dpitch = remoter.mouse_y + remoter.right_y;
-        cmd.dyaw = remoter.mouse_x + remoter.right_x;
+        cmd.dpitch = remoter.mouse_y*0.005f + remoter.right_y;
+        cmd.dyaw = remoter.mouse_x*0.005f + remoter.right_x;
 
         cmd.shooter_type = NORMAL;
         if (!remoter.last_key.Z && remoter.key.Z)
@@ -84,11 +86,11 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd.fire = false;
 
-        // if (remoter.mouse_right)
-        //     cmd.auto_aim = true;
-        // else
-        //     cmd.auto_aim = false;
-        cmd.auto_aim = true;
+        if (remoter.mouse_right)
+            cmd.auto_aim = true;
+        else
+            cmd.auto_aim = false;
+        // cmd.auto_aim = true;
 
         if (remoter.key.SHIFT || remoter.ctrl_sw == Spin)
             cmd.ifspin = true;
@@ -107,6 +109,7 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.aim_target = (cmd.aim_target + 1) % 10;
 
         ui_msg.reset = ui_reset;
+        ui_msg.fire = motor.fire;
         ui_msg.aim_target_x = static_cast<uint8_t>(vision_rx.project_x);
         ui_msg.aim_target_y = static_cast<uint8_t>(vision_rx.project_y);
         ui_msg.aim_target_set = cmd.aim_target;
