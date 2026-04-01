@@ -39,8 +39,8 @@ extern TX_SEMAPHORE IMUThreadSem;
     uint8_t UIMsg[8];
     uint8_t CmdMsg[8];
 
-    comm_ui_t ui_msg;
-    comm_cmd_t cmd_msg;
+    comm_ui_t ui_msg{};
+    comm_cmd_t cmd_msg{};
 
     uint8_t ui_reset = 0;
 

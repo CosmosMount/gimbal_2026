@@ -41,6 +41,6 @@ struct msg_cmd_t
 
 struct msg_motor_t
 {
-    uint16_t yaw_cur;
-    uint16_t tri_spd;
+    int16_t yaw_cur;
+    int8_t tri_spd;
 };

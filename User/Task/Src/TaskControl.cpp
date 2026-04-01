@@ -151,7 +151,7 @@ static float sin_signal(float t, float T, float amplitude)
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x201);
 
     PID yaw_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 10.0f, PID_POSITION | PID_Derivative_On_Measurement);
-    PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 500.0f, 100.0f, PID_POSITION);
+    PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 25000.0f, 100.0f, PID_POSITION);
 
     PID pitch_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 50.0f, PID_POSITION | PID_Derivative_On_Measurement);
     PID pitch_spd_pid(200.0f, 0.0f, 1000.0f, 500.0f, 50.0f, PID_POSITION | PID_Derivative_On_Measurement);
@@ -412,10 +412,10 @@ static float sin_signal(float t, float T, float amplitude)
             }
         }
 
-            if (!cmd.shoot)
-            {
-                shooter_state = CLOSED;
-            }
+        if (!cmd.shoot)
+        {
+            shooter_state = CLOSED;
+        }
 
         switch (shooter_state)
         {
