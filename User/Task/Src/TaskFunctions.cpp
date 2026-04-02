@@ -52,12 +52,26 @@ extern TX_SEMAPHORE IMUThreadSem;
 
         comm = *reinterpret_cast<comm_chassis_t*>(CommMsg);
 
-        if ((remoter.ctrl_sw == Normal || remoter.ctrl_sw == Spin || remoter.ctrl_sw == N2S || remoter.ctrl_sw == S2N) 
-            && tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) == TX_SUCCESS
-            && !remoter.offline)
-            cmd.ifmove = true;
-        else
+        if (remoter.offline || tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) != TX_SUCCESS)
+        {
             cmd.ifmove = false;
+        }
+        else
+        {
+            if (remoter.ctrl_sw != remoter.last_ctrl_sw)
+            {
+                if (remoter.ctrl_sw == Normal || remoter.ctrl_sw == Spin || remoter.ctrl_sw == N2S || remoter.ctrl_sw == S2N)
+                    cmd.ifmove = true;
+                else
+                    cmd.ifmove = false;
+            }
+
+            if (remoter.key.R && remoter.key.CTRL)
+                cmd.ifmove = false;
+
+            if (remoter.key.F && remoter.key.CTRL)
+                cmd.ifmove = true;
+        }
 
         cmd_msg.vx = static_cast<int8_t>(((remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>(((remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f)+remoter.left_x)*10);
@@ -95,12 +109,13 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd.ifspin = false;
 
-        if (!remoter.last_key.B && remoter.key.B)
-            cmd.ifjump = true;
-        else
-            cmd.ifjump = false;
+        // if (!remoter.last_key.B && remoter.key.B)
+        //     cmd.ifjump = true;
+        // else
+        //     cmd.ifjump = false;
+        cmd.ifjump = false;
 
-        if (remoter.key.CTRL && remoter.key.G)
+        if (remoter.key.CTRL && remoter.key.B)
             ui_reset = 1;
 
         if (!remoter.last_key.E && remoter.key.E)

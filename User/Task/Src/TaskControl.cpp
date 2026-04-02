@@ -46,8 +46,8 @@ typedef struct
     float kd;
 } pid_tuning_t;
 
-pid_tuning_t yaw_pos_tuning = {160.0f, 0.0f};
-pid_tuning_t yaw_spd_tuning = {320.0f, 5000.0f};
+pid_tuning_t yaw_pos_tuning = {100.0f, 2200.0f};
+pid_tuning_t yaw_spd_tuning = {6000.0f, 0.0f};
 pid_tuning_t pitch_pos_tuning = {140.0f, 0.0f};
 pid_tuning_t pitch_spd_tuning = {100.0f, 1000.0f};
 
@@ -316,7 +316,7 @@ static float sin_signal(float t, float T, float amplitude)
                 pitch_spd_pid.ref = pitch_pos_pid.result;
                 pitch_spd_pid.fdb = ins.gyro_p;
                 pitch_spd_pid.UpdateResult();
-                motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result);//0;//
+                motor.yaw_cur = Numeric::Int16Constrain(static_cast<int16_t>(-yaw_spd_pid.result),-25000,25000);
                 pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*Tk_6020+3500*arm_cos_f32(ins.pitch*DegreeToRad));
 
                 break;
@@ -399,7 +399,7 @@ static float sin_signal(float t, float T, float amplitude)
                     pitch_spd_pid.ref = pitch_pos_pid.result;
                     pitch_spd_pid.fdb = ins.gyro_p;
                     pitch_spd_pid.UpdateResult();
-                    motor.yaw_cur = static_cast<int16_t>(-yaw_spd_pid.result);//0;//
+                    motor.yaw_cur = Numeric::Int16Constrain(static_cast<int16_t>(-yaw_spd_pid.result), -25000, 25000);
                     pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3500*arm_cos_f32(ins.pitch*DegreeToRad)*0.5f);
                 }
 
@@ -449,7 +449,7 @@ static float sin_signal(float t, float T, float amplitude)
                         //     motor.tri_spd = BulletFreq[comm.level-1][0];
                         // if (comm.heat_now >= comm.heat_limit*0.85f)
                         //     motor.tri_spd = 0;
-                        motor.tri_spd = 4;
+                        motor.tri_spd = 6;
                         break;
                     case BURST:
                         motor.tri_spd = BulletFreq[comm.level-1][2];
