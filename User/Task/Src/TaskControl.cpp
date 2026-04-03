@@ -48,8 +48,8 @@ typedef struct
 
 pid_tuning_t yaw_pos_tuning = {100.0f, 2200.0f};
 pid_tuning_t yaw_spd_tuning = {6000.0f, 0.0f};
-pid_tuning_t pitch_pos_tuning = {140.0f, 0.0f};
-pid_tuning_t pitch_spd_tuning = {100.0f, 1000.0f};
+pid_tuning_t pitch_pos_tuning = {120.0f, 1000.0f};//160 1000
+pid_tuning_t pitch_spd_tuning = {300.0f, 0.0f};//500 0
 
 float pitch_comp_tuning=1.0f;
 float yaw_comp_tuning=1.0f;
@@ -301,6 +301,16 @@ static float sin_signal(float t, float T, float amplitude)
                         break;
                     }
                 }
+                else
+                {
+                    aim_lost_cnt = 0;
+                }
+
+                if (!cmd.auto_aim)
+                {
+                    gimbal_state = MANUALAIM;
+                    break;
+                }
 
                 yaw_pos_pid.ref = ins.total_yaw*DegreeToRad + delta_yaw;
                 pitch_pos_pid.ref = -vision_pitch_filter.Update(vision_rx.pitch);
@@ -349,12 +359,12 @@ static float sin_signal(float t, float T, float amplitude)
                 {
                 #ifdef NONVISION
                     // pitch_mit.pos_ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
-                    pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
-                    if (yaw_init == 0.0f)
-                        yaw_init = ins.total_yaw*DegreeToRad;
-                    yaw_pos_pid.ref = yaw_init + signal(DWT_GetTimeline_s(), 0.5f, 0.21f);
+                    // pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);
+                    // if (yaw_init == 0.0f)
+                    //     yaw_init = ins.total_yaw*DegreeToRad;
+                    // yaw_pos_pid.ref = yaw_init + signal(DWT_GetTimeline_s(), 0.5f, 0.21f);
                     // yaw_spd_pid.ref = tri_signal_dot(DWT_GetTimeline_s(), yaw_signal_T, yaw_signal_step);
-                    // pitch_pos_pid.ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
+                    pitch_pos_pid.ref = tri_signal(DWT_GetTimeline_s(), pitch_signal_T, pitch_signal_step);
                     // yaw_pos_pid.ref = ins.total_yaw*DegreeToRad-cmd.dyaw*0.05f;
                 #else
                     if (fabs(cmd.dpitch)<0.005f)

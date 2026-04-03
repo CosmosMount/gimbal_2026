@@ -8,6 +8,7 @@
 #include "magicmsgs.hpp"
 #include "config_gimbal.hpp"
 #include "config_comm.hpp"
+#include "slope.hpp"
 
 #ifdef DEBUG
 msg_remoter_t debug_remoter;
@@ -23,6 +24,10 @@ extern TX_SEMAPHORE IMUThreadSem;
 [[noreturn]] void OperateThreadFun(ULONG initial_input) 
 {
     UNUSED(initial_input);
+
+    SLOPE raw_kbd_vx_updater(0.0f, 0.001f);
+    SLOPE raw_kbd_vy_updater(0.0f, 0.001f);
+    SLOPE raw_kbd_dlen_updater(0.15f, 0.005f);
 
     om_topic_t *cmd_topic = om_config_topic(nullptr, "ca", "cmd", sizeof(msg_cmd_t));
     msg_cmd_t cmd{};
@@ -52,7 +57,8 @@ extern TX_SEMAPHORE IMUThreadSem;
 
         comm = *reinterpret_cast<comm_chassis_t*>(CommMsg);
 
-        if (remoter.offline || tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) != TX_SUCCESS)
+        if (remoter.offline || tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) != TX_SUCCESS 
+        || remoter.ctrl_sw == Relax || remoter.ctrl_sw == R2N)
         {
             cmd.ifmove = false;
         }
@@ -73,11 +79,16 @@ extern TX_SEMAPHORE IMUThreadSem;
                 cmd.ifmove = true;
         }
 
-        cmd_msg.vx = static_cast<int8_t>(((remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f)+remoter.left_y)*10);
-        cmd_msg.vy = static_cast<int8_t>(((remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f)+remoter.left_x)*10);
-        cmd_msg.dlen = static_cast<int8_t>(((remoter.key.E ? 1.0f : 0.0f) - (remoter.key.Q ? 1.0f : 0.0f))*10);
-        cmd.dpitch = remoter.mouse_y + remoter.right_y;
-        cmd.dyaw = remoter.mouse_x + remoter.right_x;
+        float raw_kbd_vx = (remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f);
+        float raw_kbd_vy = (remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f);
+        float raw_kbd_dlen = (remoter.key.E ? 1.0f : 0.0f) - (remoter.key.Q ? 1.0f : 0.0f);
+
+
+        cmd_msg.vx = static_cast<int8_t>((raw_kbd_vx_updater.UpdateVal(raw_kbd_vx)+remoter.left_y)*10);
+        cmd_msg.vy = static_cast<int8_t>((raw_kbd_vy_updater.UpdateVal(raw_kbd_vy)+remoter.left_x)*10);
+        cmd_msg.dlen = static_cast<int8_t>((raw_kbd_dlen_updater.UpdateVal(raw_kbd_dlen))*10);
+        cmd.dpitch = remoter.mouse_y*0.005f + remoter.right_y;
+        cmd.dyaw = remoter.mouse_x*0.005f + remoter.right_x;
 
         cmd.shooter_type = NORMAL;
         if (!remoter.last_key.Z && remoter.key.Z)
@@ -98,11 +109,11 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd.fire = false;
 
-        // if (remoter.mouse_right)
-        //     cmd.auto_aim = true;
-        // else
-        //     cmd.auto_aim = false;
-        cmd.auto_aim = true;
+        if (remoter.mouse_right)
+            cmd.auto_aim = true;
+        else
+            cmd.auto_aim = false;
+        // cmd.auto_aim = true;
 
         if (remoter.key.SHIFT || remoter.ctrl_sw == Spin)
             cmd.ifspin = true;
