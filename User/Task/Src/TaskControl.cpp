@@ -413,7 +413,7 @@ static float sin_signal(float t, float T, float amplitude)
                     pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3500*arm_cos_f32(ins.pitch*DegreeToRad)*0.5f);
                 }
 
-                if (valid_vision_rx)
+                if (valid_vision_rx && cmd.auto_aim)
                 {
                     gimbal_state = AUTOAIM;
                 }
@@ -459,7 +459,7 @@ static float sin_signal(float t, float T, float amplitude)
                         //     motor.tri_spd = BulletFreq[comm.level-1][0];
                         // if (comm.heat_now >= comm.heat_limit*0.85f)
                         //     motor.tri_spd = 0;
-                        motor.tri_spd = 6;
+                        motor.tri_spd = 8;
                         break;
                     case BURST:
                         motor.tri_spd = BulletFreq[comm.level-1][2];
