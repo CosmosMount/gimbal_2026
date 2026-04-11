@@ -31,6 +31,7 @@
 #include "crc.hpp"
 #include "magicmsgs.hpp"
 #include "config_comm.hpp"
+#include "config_gimbal.hpp"
 #include "tx_api.h"
 /* USER CODE END Includes */
 
@@ -238,21 +239,26 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
 
   om_suber_t *ins_suber = om_subscribe(om_find_topic("ins", UINT32_MAX));
   om_suber_t *comm_suber = om_subscribe(om_find_topic("comm", UINT32_MAX));
+  om_suber_t *cmd_suber = om_subscribe(om_find_topic("cmd", UINT32_MAX));
   struct comm_chassis_t comm;
   struct msg_ins_t ins;
+  struct msg_cmd_t cmd;
   UX_PARAMETER_NOT_USED(thread_input);
   tx_thread_sleep(10);
   while (1)
   {
     om_suber_export(ins_suber, &ins, false);
     om_suber_export(comm_suber, &comm, false);
-    
+    om_suber_export(cmd_suber, &cmd, false);
     if ((device->ux_slave_device_state == UX_DEVICE_CONFIGURED) && (cdc_acm != UX_NULL))
     {
       msg_visiontx.header = 0x5A;
       msg_visiontx.detect_color = 1-comm.color;
       msg_visiontx.reset_tracker = false;
-      msg_visiontx.set_target = 0x00;
+      if (cmd.aim_rune)
+        msg_visiontx.set_target = 0x01;
+      else
+        msg_visiontx.set_target = 0x00;
       msg_visiontx.q1 = ins.quaternion[0];
       msg_visiontx.q2 = ins.quaternion[1];
       msg_visiontx.q3 = ins.quaternion[2];
