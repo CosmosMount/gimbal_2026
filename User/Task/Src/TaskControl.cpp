@@ -198,11 +198,17 @@ static float sin_signal(float t, float T, float amplitude)
 
     KalmanFilter_1D vision_yaw_filter;
     KalmanFilter_1D vision_pitch_filter;
-
     vision_yaw_filter.SetQ(0.001f);
     vision_yaw_filter.SetR(0.543f);
     vision_pitch_filter.SetQ(0.0001f);    
     vision_pitch_filter.SetR(0.543f);
+
+    KalmanFilter_1D manual_yaw_filter;
+    KalmanFilter_1D manual_pitch_filter;
+    manual_yaw_filter.SetQ(0.001f);
+    manual_yaw_filter.SetR(0.543f);
+    manual_yaw_filter.SetQ(0.0001f);    
+    manual_yaw_filter.SetR(0.543f);
 
     bool inited = false;
     bool maintained_yaw = false;
@@ -334,14 +340,6 @@ static float sin_signal(float t, float T, float amplitude)
 
             case MANUALAIM:
             {
-                // yaw_pos_pid.kp = yaw_pos_manual_pid.kp;
-                // yaw_pos_pid.kd = yaw_pos_manual_pid.kd;
-                // yaw_spd_pid.kp = yaw_spd_manual_pid.kp;
-                // yaw_spd_pid.kd = yaw_spd_manual_pid.kd;
-                // pitch_pos_pid.kp = pitch_pos_manual_pid.kp;
-                // pitch_pos_pid.kd = pitch_pos_manual_pid.kd;
-                // pitch_spd_pid.kp = pitch_spd_manual_pid.kp;
-                // pitch_spd_pid.kd = pitch_spd_manual_pid.kd;
 
                 if (!inited)
                 {
@@ -379,7 +377,9 @@ static float sin_signal(float t, float T, float amplitude)
                     else
                     {
                         maintained_pitch = false;
-                        pitch_pos_pid.ref = FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f);//sin_signal(DWT_GetTimeline_s(),pitch_signal_T,pitch_signal_step);//
+                        pitch_pos_pid.ref = manual_pitch_filter.Update(
+                            FloatConstrain(ins.pitch*DegreeToRad-cmd.dpitch*0.05f, -0.6f, 0.4f)
+                        );
                     }
                     
                     if (fabs(cmd.dyaw)<0.005f)
@@ -394,7 +394,7 @@ static float sin_signal(float t, float T, float amplitude)
                     else
                     {
                         maintained_yaw = false;
-                        yaw_pos_pid.ref = ins.total_yaw*DegreeToRad-cmd.dyaw*0.05f;
+                        yaw_pos_pid.ref = manual_yaw_filter.Update(ins.total_yaw*DegreeToRad-cmd.dyaw*0.05f);
                     }
                     
                 #endif

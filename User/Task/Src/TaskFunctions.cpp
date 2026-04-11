@@ -27,7 +27,10 @@ extern TX_SEMAPHORE IMUThreadSem;
 
     SLOPE raw_kbd_vx_updater(0.0f, 0.001f);
     SLOPE raw_kbd_vy_updater(0.0f, 0.001f);
-    SLOPE raw_kbd_dlen_updater(0.15f, 0.005f);
+    SLOPE raw_kbd_dlen_updater(0.15f, 0.002f);
+
+    raw_kbd_vx_updater.SetDecreasePath(0.005f);
+    raw_kbd_vy_updater.SetDecreasePath(0.005f);
 
     om_topic_t *cmd_topic = om_config_topic(nullptr, "ca", "cmd", sizeof(msg_cmd_t));
     msg_cmd_t cmd{};
@@ -89,8 +92,8 @@ extern TX_SEMAPHORE IMUThreadSem;
         cmd_msg.vx = static_cast<int8_t>((raw_kbd_vx_updater.UpdateVal(raw_kbd_vx)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>((raw_kbd_vy_updater.UpdateVal(raw_kbd_vy)+remoter.left_x)*10);
         cmd_msg.dlen = static_cast<int8_t>((raw_kbd_dlen_updater.UpdateVal(raw_kbd_dlen))*10);
-        cmd.dpitch = remoter.mouse_y*0.005f + remoter.right_y;
-        cmd.dyaw = remoter.mouse_x*0.01f + remoter.right_x;
+        cmd.dpitch = remoter.mouse_y*0.008f + remoter.right_y;
+        cmd.dyaw = remoter.mouse_x*0.02f + remoter.right_x;
 
         cmd.shooter_type = NORMAL;
         if (!remoter.last_key.Z && remoter.key.Z)
