@@ -2,18 +2,15 @@
   "version": "2.0.0",
   "tasks": [
     {
-        "label": "flash-openocd",
-        "type": "shell",
-        "command": "openocd",
-        "args": [
-            "-f",
-            "interface/cmsis-dap.cfg",//stlink.cfg",//"interface/
-            "-f",
-            "target/stm32h7x.cfg",
-            "-c",
-            "program build/Debug/wbr_gimbal.elf reset exit"
-        ],
-        "problemMatcher": []
+      "label": "flash-openocd",
+      "type": "shell",
+      "command": "openocd",
+      "args": [
+        "-f", "interface/cmsis-dap.cfg",
+        // "-f", "interface/stlink.cfg",
+        "-f", "target/stm32h7x.cfg",
+        "-c", "program build/Debug/wbr_gimbal.elf reset exit",
+      ]
     }
-]
+  ]
 }
