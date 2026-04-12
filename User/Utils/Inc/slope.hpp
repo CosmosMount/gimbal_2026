@@ -45,7 +45,8 @@ public:
 
     float UpdateVal(float new_val) 
     {
-        if (_val-new_val<1.0f*_increase_path || new_val-_val<1.0f*_decrease_path) 
+        float delta = new_val - _val;
+        if ((delta>=0.0f&&delta<_increase_path) || (delta<0.0f&&delta>-_decrease_path)) 
         {
             _val = new_val;
             _reached = true;
