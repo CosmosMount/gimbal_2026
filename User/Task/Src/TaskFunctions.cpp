@@ -9,6 +9,7 @@
 #include "config_gimbal.hpp"
 #include "config_comm.hpp"
 #include "slope.hpp"
+#include "kalmanfilter.hpp"
 
 #ifdef DEBUG
 msg_remoter_t debug_remoter;
@@ -55,6 +56,13 @@ extern TX_SEMAPHORE IMUThreadSem;
 
     uint8_t ui_reset = 0;
 
+    Filter::KalmanFilter_1D manual_yaw_filter;
+    Filter::KalmanFilter_1D manual_pitch_filter;
+    manual_yaw_filter.SetQ(0.1f);
+    manual_yaw_filter.SetR(0.543f);
+    manual_yaw_filter.SetQ(0.1f);    
+    manual_yaw_filter.SetR(0.543f);
+
     for (;;)
     {
         om_suber_export(remoter_suber, &remoter, false);
@@ -92,8 +100,8 @@ extern TX_SEMAPHORE IMUThreadSem;
         cmd_msg.vx = static_cast<int8_t>((raw_kbd_vx_updater.UpdateVal(raw_kbd_vx)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>((raw_kbd_vy_updater.UpdateVal(raw_kbd_vy)+remoter.left_x)*10);
         cmd_msg.dlen = static_cast<int8_t>((raw_kbd_dlen_updater.UpdateVal(raw_kbd_dlen))*10);
-        cmd.dpitch = remoter.mouse_y*0.008f + remoter.right_y;
-        cmd.dyaw = remoter.mouse_x*0.02f + remoter.right_x;
+        cmd.dpitch = manual_pitch_filter.Update(remoter.mouse_y*0.008f) + remoter.right_y;
+        cmd.dyaw = manual_yaw_filter.Update(remoter.mouse_x*0.02f) + remoter.right_x;
 
         cmd.shooter_type = NORMAL;
         if (!remoter.last_key.Z && remoter.key.Z)
