@@ -30,8 +30,8 @@ struct msg_cmd_t
     float dyaw;
     float dpitch;
     bool aim_rune;
+    bool ifturn;
     bool ifmove;
-    bool ifjump;
     bool ifspin;
     bool shoot;
     bool fire;

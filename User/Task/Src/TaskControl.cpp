@@ -48,8 +48,8 @@ typedef struct
 
 pid_tuning_t yaw_pos_tuning = {100.0f, 2200.0f};
 pid_tuning_t yaw_spd_tuning = {6000.0f, 0.0f};
-pid_tuning_t pitch_pos_tuning = {120.0f, 1000.0f};//160 1000
-pid_tuning_t pitch_spd_tuning = {300.0f, 0.0f};//500 0
+pid_tuning_t pitch_pos_tuning = {120.0f, 1000.0f};
+pid_tuning_t pitch_spd_tuning = {300.0f, 0.0f};
 
 float pitch_comp_tuning=1.0f;
 float yaw_comp_tuning=1.0f;
@@ -337,13 +337,13 @@ static float sin_signal(float t, float T, float amplitude)
                 if (!inited)
                 {
                     yaw_pos_pid.ref  = ins.total_yaw * DegreeToRad;
-                    pitch_pos_pid.ref = ins.pitch * DegreeToRad;
-                    pitch_motor.currentSet = ins.pitch > 0.0f ? -11500 : 11500;
-                    if (fabs(ins.pitch) < 5.0f)
+                    pitch_pos_pid.ref = 0.0f;
+                    if (comm.inited)
                     {
-                        pitch_motor.currentSet = 3500;
-                        if (comm.inited)
+                        if (fabs(ins.pitch) < 5.0f)
+                        {  
                             inited = true;
+                        }
                     }
                 }
                 else 
@@ -387,22 +387,28 @@ static float sin_signal(float t, float T, float amplitude)
                         maintained_yaw = false;
                         yaw_pos_pid.ref = ins.total_yaw*DegreeToRad-cmd.dyaw*0.05f;
                     }
-                    
+
+                    if (cmd.ifturn)
+                    {
+                        yaw_pos_pid.ref = ins.total_yaw*DegreeToRad+PI;
+                        yaw_maintain = yaw_pos_pid.ref;
+                        maintained_yaw = true;
+                    }
                 #endif
                     yaw_pos_pid.fdb = ins.total_yaw*DegreeToRad;
                     yaw_pos_pid.UpdateResult();
                     yaw_spd_pid.ref = yaw_pos_pid.result;
                     yaw_spd_pid.fdb = ins.gyro_y;
-                    yaw_spd_pid.UpdateResult();
-
-                    pitch_pos_pid.fdb = ins.pitch*DegreeToRad;
-                    pitch_pos_pid.UpdateResult();
-                    pitch_spd_pid.ref = pitch_pos_pid.result;
-                    pitch_spd_pid.fdb = ins.gyro_p;
-                    pitch_spd_pid.UpdateResult();
-                    motor.yaw_cur = Numeric::Int16Constrain(static_cast<int16_t>(-yaw_spd_pid.result), -25000, 25000);
-                    pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3500*arm_cos_f32(ins.pitch*DegreeToRad)*0.5f);
+                    yaw_spd_pid.UpdateResult();                    
                 }
+
+                pitch_pos_pid.fdb = ins.pitch*DegreeToRad;
+                pitch_pos_pid.UpdateResult();
+                pitch_spd_pid.ref = pitch_pos_pid.result;
+                pitch_spd_pid.fdb = ins.gyro_p;
+                pitch_spd_pid.UpdateResult();
+                motor.yaw_cur = Numeric::Int16Constrain(static_cast<int16_t>(-yaw_spd_pid.result), -25000, 25000);
+                pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3500*arm_cos_f32(ins.pitch*DegreeToRad)*0.5f);
 
                 if (valid_vision_rx && cmd.auto_aim)
                 {
@@ -439,27 +445,11 @@ static float sin_signal(float t, float T, float amplitude)
                     && vision_rx.fire)
                     || cmd.fire)
                 {
-                    switch (cmd.shooter_type)
-                    {
-                    case SINGLE:
+                    motor.tri_spd = 8;
+                    if (comm.heatnow >= comm.heatlimit*0.85f)
+                        motor.tri_spd = 0;
+                    if (cmd.aim_rune)
                         motor.tri_spd = 6;
-                        break;
-                    case NORMAL:
-                        // motor.tri_spd = BulletFreq[comm.level-1][1];
-                        // if (comm.heat_now >= comm.heat_limit*0.75f)
-                        //     motor.tri_spd = BulletFreq[comm.level-1][0];
-                        // if (comm.heat_now >= comm.heat_limit*0.85f)
-                        //     motor.tri_spd = 0;
-                        motor.tri_spd = 8;
-                        break;
-                    case BURST:
-                        motor.tri_spd = BulletFreq[comm.level-1][2];
-                        if (comm.heatnow >= comm.heatlimit*0.75f)
-                            motor.tri_spd = BulletFreq[comm.level-1][0];
-                        if (comm.heatnow >= comm.heatlimit*0.85f)
-                            motor.tri_spd = 0;
-                        break;
-                    }
                 }
                 else
                 {

@@ -256,9 +256,9 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
       msg_visiontx.detect_color = 1-comm.color;
       msg_visiontx.reset_tracker = false;
       if (cmd.aim_rune)
-        msg_visiontx.set_target = 0x01;
-      else
         msg_visiontx.set_target = 0x08;
+      else
+        msg_visiontx.set_target = 0x00;
       msg_visiontx.q1 = ins.quaternion[0];
       msg_visiontx.q2 = ins.quaternion[1];
       msg_visiontx.q3 = ins.quaternion[2];

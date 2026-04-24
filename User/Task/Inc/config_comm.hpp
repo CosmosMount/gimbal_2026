@@ -28,12 +28,13 @@ struct comm_cmd_t
     uint8_t ifjump : 1;
     uint8_t ifspin : 1;
     uint8_t ifturn : 1;
+    uint8_t ifstair : 1;
+    uint8_t iffly : 1;
     int16_t yaw_cur;
     int8_t vx;
     int8_t vy;
     int8_t dlen;
     int8_t tri_spd;
-    uint8_t reserved;
 };
 
 #define UIMSG_SIZE sizeof(comm_ui_t)

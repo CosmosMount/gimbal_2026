@@ -26,12 +26,9 @@ extern TX_SEMAPHORE IMUThreadSem;
 {
     UNUSED(initial_input);
 
-    SLOPE raw_kbd_vx_updater(0.0f, 0.001f);
-    SLOPE raw_kbd_vy_updater(0.0f, 0.001f);
-    SLOPE raw_kbd_dlen_updater(0.15f, 0.002f);
-
-    raw_kbd_vx_updater.SetDecreasePath(0.005f);
-    raw_kbd_vy_updater.SetDecreasePath(0.005f);
+    SLOPE raw_kbd_vx_updater(0.0f, 0.002f);
+    SLOPE raw_kbd_vy_updater(0.0f, 0.002f);
+    SLOPE raw_kbd_dlen_updater(0.15f, 0.001f);
 
     om_topic_t *cmd_topic = om_config_topic(nullptr, "ca", "cmd", sizeof(msg_cmd_t));
     msg_cmd_t cmd{};
@@ -75,6 +72,7 @@ extern TX_SEMAPHORE IMUThreadSem;
         || remoter.ctrl_sw == Relax || remoter.ctrl_sw == R2N)
         {
             cmd.ifmove = false;
+            cmd.aim_rune = false;
         }
         else
         {
@@ -86,10 +84,10 @@ extern TX_SEMAPHORE IMUThreadSem;
                     cmd.ifmove = false;
             }
 
-            if (remoter.key.R && remoter.key.CTRL)
+            if (remoter.key.Z && remoter.key.CTRL)
                 cmd.ifmove = false;
 
-            if (remoter.key.F && remoter.key.CTRL)
+            if (remoter.key.X && remoter.key.CTRL)
                 cmd.ifmove = true;
         }
 
@@ -100,16 +98,10 @@ extern TX_SEMAPHORE IMUThreadSem;
         cmd_msg.vx = static_cast<int8_t>((raw_kbd_vx_updater.UpdateVal(raw_kbd_vx)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>((raw_kbd_vy_updater.UpdateVal(raw_kbd_vy)+remoter.left_x)*10);
         cmd_msg.dlen = static_cast<int8_t>((raw_kbd_dlen_updater.UpdateVal(raw_kbd_dlen))*10);
-        cmd.dpitch = manual_pitch_filter.Update(remoter.mouse_y*0.008f) + remoter.right_y;
-        cmd.dyaw = manual_yaw_filter.Update(remoter.mouse_x*0.02f) + remoter.right_x;
+        cmd.dpitch = manual_pitch_filter.Update(remoter.mouse_y*0.01f) + remoter.right_y;
+        cmd.dyaw = manual_yaw_filter.Update(remoter.mouse_x*0.025f) + remoter.right_x;
 
         cmd.shooter_type = NORMAL;
-        if (!remoter.last_key.Z && remoter.key.Z)
-            cmd.shooter_type = SINGLE;
-        if (!remoter.last_key.X && remoter.key.X)
-            cmd.shooter_type = NORMAL;
-        if (!remoter.last_key.C && remoter.key.C)
-            cmd.shooter_type = BURST;
         
         if (remoter.shoot_sw == Warm || remoter.shoot_sw == Fire)
             cmd.shoot = true;
@@ -133,23 +125,43 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd.ifspin = false;
 
-        // if (!remoter.last_key.V && remoter.key.V)
+        // if (!remoter.last_key.C && remoter.key.C)
         //     cmd.ifjump = true;
         // else
         //     cmd.ifjump = false;
-        cmd.ifjump = false;
+        cmd_msg.ifjump = false;
 
-        if (remoter.key.CTRL && remoter.key.B)
+        if (!remoter.last_key.R && remoter.key.R)
+            cmd.ifturn = true;
+        else
+            cmd.ifturn = false;
+        
+        if (!remoter.last_key.G && remoter.key.G)
+            cmd_msg.iffly = true;
+        else
+            cmd_msg.iffly = false;
+
+        if (!remoter.last_key.V && remoter.key.V)
+            cmd_msg.ifstair = true;
+        else
+            cmd_msg.ifstair = false;
+
+        if (!remoter.last_key.B && remoter.key.B)
             ui_reset = 1;
         else
             ui_reset = 0;
 
-        if (remoter.key.G && !remoter.last_key.G)
-            cmd.aim_rune = !cmd.aim_rune;
+        if (!remoter.last_key.F && remoter.key.F)
+        {
+            if (cmd.aim_rune)
+                cmd.aim_rune = false;
+            else
+                cmd.aim_rune = true;
+        }
 
         cmd_msg.ifmove = cmd.ifmove;
-        cmd_msg.ifjump = cmd.ifjump;
         cmd_msg.ifspin = cmd.ifspin;
+        cmd_msg.ifturn = cmd.ifturn;
         cmd_msg.yaw_cur = motor.yaw_cur;
         cmd_msg.tri_spd = motor.tri_spd;
 

@@ -9,10 +9,16 @@ TX_SEMAPHORE RemoterGot;
 
 // 数组在 D1 RAM
 __attribute__((section(".RAM_D1"))) uint8_t dr16_rx[DR16_DATA_SIZE];
+__attribute__((section(".RAM_D1"))) uint8_t vt03_rx[VT03_DATA_SIZE];
 
 inline dr16_data_t& Dr16_Data()
 {
     return *reinterpret_cast<dr16_data_t*>(dr16_rx);
+}
+
+inline vt03_data_t& Vt03_Data()
+{
+    return *reinterpret_cast<vt03_data_t*>(vt03_rx);
 }
 
 [[noreturn]] void RemoterThreadFun(ULONG initial_input) 

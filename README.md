@@ -24,22 +24,23 @@ STM32H723 code for wheel-legged balanced robot gimbal
 | A | 左走 | Press On |
 | D | 右走 | Press On |
 | R | 飞坡模式 | Press On |
-| Q | 一键换头 | Click Start |
-| E | 切换目标 | Click Start |
+| Q | 腿长-- | Click Start |
+| E | 腿长++ | Click Start |
 | CTRL+B | 重置UI | Press On |
 
 | KBD/MOUSE | RobotMode      | Triggering Condition |
 | --------- | -------------- | -------------------- |
-| V         | 单发模式切换 | Click Start |
+<!-- | V         | 单发模式切换 | Click Start |
 | Z         | 慢速拨弹盘 | Click Start |
 | X         | 快速拨弹盘 | Click Start |
-| C         | 快速拨弹盘 | Click Start |
-| MouseL    | 手动击打 | Click Start |
-| MouseR    | 自瞄 | Click Start |
+| C         | 快速拨弹盘 | Click Start | -->
+| MouseL      | 手动击打 | Click Start |
+| Ctrl+MouseL | 拨弹反转 | Click Start |
+| MouseR      | 自瞄 | Click Start |
 
 | KBD  | RobotMode| Triggering Condition |
 | ------ | ---------| -------------------- |
-| CTRL+Q | 腿长-- | Press On |
-| CTRL+E | 腿长++ | Press On |
+| CTRL+Q |  | Press On |
+| CTRL+E |  | Press On |
 | F      | 跳跃准备 | Press On |
 | G      | 跳跃开始 | Press On |
