@@ -144,7 +144,7 @@
 /* Defined, this value represents how many ticks per seconds for a specific hardware platform.
    The default is 1000 indicating 1 tick per millisecond.  */
 
-/* #define UX_PERIODIC_RATE     (TX_TIMER_TICKS_PER_SECOND) */
+#define UX_PERIODIC_RATE        1000
 
 /* Define control transfer timeout value in millisecond.
    The default is 10000 milliseconds.  */

@@ -24,7 +24,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "app_usbx_device.h"
-#include "tx_api.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
