@@ -442,14 +442,20 @@ static float sin_signal(float t, float T, float amplitude)
                 Rfric.speedSet = -660;
                 if (((yaw_pos_pid.ref-yaw_pos_pid.fdb)<0.01f 
                     && (pitch_pos_pid.ref-pitch_pos_pid.fdb)<0.002f 
-                    && vision_rx.fire)
+                    && vision_rx.fire
+                    && cmd.auto_aim)
                     || cmd.fire)
                 {
                     motor.tri_spd = 8;
-                    if (comm.heatnow >= comm.heatlimit*0.85f)
+                    if (comm.heatnow >= comm.heatlimit*0.75f)
                         motor.tri_spd = 0;
                     if (cmd.aim_rune)
-                        motor.tri_spd = 6;
+                    {
+                        if (cmd.fire)
+                            motor.tri_spd = 6;
+                        else
+                            motor.tri_spd = 0;
+                    }
                 }
                 else
                 {

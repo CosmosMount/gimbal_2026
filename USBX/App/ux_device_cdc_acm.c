@@ -72,6 +72,8 @@ uint32_t UserTxBufPtrOut;
 volatile UINT USB_TX_BUSY;
 volatile UINT USB_TX_SUCCESS;
 volatile UINT USB_RX_SUCCESS;
+
+extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -195,6 +197,7 @@ struct msg_visionrx_t debug_visionrx;
 VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
 {
   ULONG actual_length;
+  UINT rx_status;
   UX_SLAVE_DEVICE *device = &_ux_system_slave->ux_system_slave_device;
 
   UX_PARAMETER_NOT_USED(thread_input);
@@ -204,10 +207,7 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
   {
     if ((device->ux_slave_device_state == UX_DEVICE_CONFIGURED) && (cdc_acm != UX_NULL))
     {
-      // cdc_acm -> ux_slave_class_cdc_acm_transmission_status = UX_FALSE;
-      ux_device_class_cdc_acm_read(cdc_acm,
-                                           (UCHAR *)UserRxBufferFS,
-                                           64, &actual_length);
+      rx_status = ux_device_class_cdc_acm_read(cdc_acm, (UCHAR *)UserRxBufferFS, 64, &actual_length);
 
       if (actual_length >= sizeof(msg_visionrx))
       {
@@ -216,6 +216,11 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
         memcpy(&msg_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
       }
       memcpy(&debug_visionrx, (UCHAR *)UserRxBufferFS, sizeof(msg_visionrx));
+      
+      if (rx_status != UX_SUCCESS)
+      {
+        tx_thread_sleep(10);
+      }
     }
     om_publish(visionrx_topic, &msg_visionrx, sizeof(msg_visionrx), true, false);
     msg_visionrx.header = 0;
@@ -235,7 +240,9 @@ struct msg_visiontx_t debug_visiontx;
 VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input) 
 {
   ULONG actual_length;
+  ULONG tx_status;
   UX_SLAVE_DEVICE *device = &_ux_system_slave->ux_system_slave_device;
+  uint32_t error_count = 0;
 
   om_suber_t *ins_suber = om_subscribe(om_find_topic("ins", UINT32_MAX));
   om_suber_t *comm_suber = om_subscribe(om_find_topic("comm", UINT32_MAX));
@@ -267,9 +274,24 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
       msg_visiontx.gyro_pitch = ins.gyro_p;
       Append_CRC16_Check_Sum((uint8_t *)&msg_visiontx, sizeof(msg_visiontx));      
       memcpy(&debug_visiontx, &msg_visiontx, sizeof(msg_visiontx));
-      ux_device_class_cdc_acm_write(cdc_acm, (UCHAR *)&msg_visiontx , sizeof(msg_visiontx) , &actual_length);
-      tx_thread_sleep(2);
+      tx_status = ux_device_class_cdc_acm_write(cdc_acm, (UCHAR *)&msg_visiontx , sizeof(msg_visiontx) , &actual_length);
+      // if (tx_status != UX_SUCCESS)
+      // {
+      //   error_count ++;
+      //   if (error_count >= 50)
+      //   {
+      //     HAL_PCD_DevDisconnect(&hpcd_USB_OTG_HS);
+      //     tx_thread_sleep(200);
+      //     HAL_PCD_DevConnect(&hpcd_USB_OTG_HS);
+      //     error_count = 0; 
+      //   }
+      //   else
+      //   {
+      //     tx_thread_sleep(10);
+      //   }
+      // }
     }
+    tx_thread_sleep(2);
   }
 }
 /* USER CODE END 2 */

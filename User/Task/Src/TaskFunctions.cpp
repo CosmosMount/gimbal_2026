@@ -118,7 +118,7 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.auto_aim = true;
         else
             cmd.auto_aim = false;
-        cmd.auto_aim = true;
+        // cmd.auto_aim = true;
 
         if (remoter.key.SHIFT || remoter.ctrl_sw == Spin)
             cmd.ifspin = true;
