@@ -241,6 +241,7 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
 {
   ULONG actual_length;
   ULONG tx_status;
+  ULONG line_state = 0;
   UX_SLAVE_DEVICE *device = &_ux_system_slave->ux_system_slave_device;
   uint32_t error_count = 0;
 
@@ -272,24 +273,29 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
       msg_visiontx.q4 = ins.quaternion[3];
       msg_visiontx.gyro_yaw = ins.gyro_y;
       msg_visiontx.gyro_pitch = ins.gyro_p;
-      Append_CRC16_Check_Sum((uint8_t *)&msg_visiontx, sizeof(msg_visiontx));      
-      memcpy(&debug_visiontx, &msg_visiontx, sizeof(msg_visiontx));
-      tx_status = ux_device_class_cdc_acm_write(cdc_acm, (UCHAR *)&msg_visiontx , sizeof(msg_visiontx) , &actual_length);
-      // if (tx_status != UX_SUCCESS)
-      // {
-      //   error_count ++;
-      //   if (error_count >= 50)
-      //   {
-      //     HAL_PCD_DevDisconnect(&hpcd_USB_OTG_HS);
-      //     tx_thread_sleep(200);
-      //     HAL_PCD_DevConnect(&hpcd_USB_OTG_HS);
-      //     error_count = 0; 
-      //   }
-      //   else
-      //   {
-      //     tx_thread_sleep(10);
-      //   }
-      // }
+      Append_CRC16_Check_Sum((uint8_t *)&msg_visiontx, sizeof(msg_visiontx));
+      ux_device_class_cdc_acm_ioctl(cdc_acm, UX_SLAVE_CLASS_CDC_ACM_IOCTL_GET_LINE_STATE, &line_state);
+      if (line_state & UX_SLAVE_CLASS_CDC_ACM_LINE_STATE_DTR)
+      {   
+        tx_status = ux_device_class_cdc_acm_write(cdc_acm, (UCHAR *)&msg_visiontx , sizeof(msg_visiontx) , &actual_length);
+        memcpy(&debug_visiontx, &msg_visiontx, sizeof(msg_visiontx));
+        // if (tx_status != UX_SUCCESS)
+        // {
+        //   error_count ++;
+        //   if (error_count >= 50)
+        //   {
+        //     HAL_PCD_DevDisconnect(&hpcd_USB_OTG_HS);
+        //     tx_thread_sleep(200);
+        //     HAL_PCD_DevConnect(&hpcd_USB_OTG_HS);
+        //     error_count = 0; 
+        //   }
+        //   else
+        //   {
+        //     tx_thread_sleep(10);
+        //   }
+        // }
+      }
+      
     }
     tx_thread_sleep(2);
   }

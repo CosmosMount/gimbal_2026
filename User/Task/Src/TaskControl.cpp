@@ -305,7 +305,7 @@ static float sin_signal(float t, float T, float amplitude)
                     aim_lost_cnt = 0;
                 }
 
-                if (!cmd.auto_aim)
+                if (!cmd.auto_aim || !vision_rx.tracking)
                 {
                     gimbal_state = MANUALAIM;
                     break;
@@ -410,7 +410,7 @@ static float sin_signal(float t, float T, float amplitude)
                 motor.yaw_cur = Numeric::Int16Constrain(static_cast<int16_t>(-yaw_spd_pid.result), -25000, 25000);
                 pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3500*arm_cos_f32(ins.pitch*DegreeToRad)*0.5f);
 
-                if (valid_vision_rx && cmd.auto_aim)
+                if (valid_vision_rx && cmd.auto_aim && vision_rx.tracking)
                 {
                     gimbal_state = AUTOAIM;
                 }

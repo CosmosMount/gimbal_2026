@@ -191,7 +191,7 @@ UINT MX_USBX_Device_Init(VOID *memory_ptr)
   /* Create the usbx cdc acm read thread */
   if (tx_thread_create(&ux_cdc_read_thread, "cdc_acm_read_usbx_app_thread_entry",
                        usbx_cdc_acm_read_thread_entry, 1, pointer,
-                       UX_DEVICE_APP_THREAD_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE,
+                       UX_DEVICE_APP_THREAD_STACK_SIZE, 5, 5, TX_NO_TIME_SLICE,
                        TX_AUTO_START) != TX_SUCCESS)
   {
     return TX_THREAD_ERROR;
@@ -206,7 +206,7 @@ UINT MX_USBX_Device_Init(VOID *memory_ptr)
   /* Create the usbx_cdc_acm_write_thread_entry thread */
   if (tx_thread_create(&ux_cdc_write_thread, "cdc_acm_write_usbx_app_thread_entry",
                        usbx_cdc_acm_write_thread_entry, 1, pointer,
-                       UX_DEVICE_APP_THREAD_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE,
+                       UX_DEVICE_APP_THREAD_STACK_SIZE, 5, 5, TX_NO_TIME_SLICE,
                        TX_AUTO_START) != TX_SUCCESS)
   {
     return TX_THREAD_ERROR;

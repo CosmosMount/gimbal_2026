@@ -165,7 +165,7 @@ struct msg_visiontx_t
 {
     uint8_t header;           // 发送数据包的头
     uint8_t detect_color : 1; // 检测到的颜色
-    bool reset_tracker : 1;   // 是否重置追踪
+    uint8_t reset_tracker : 1;   // 是否重置追踪
     uint8_t set_target : 4;   // 设置目标
     uint8_t reserved : 2;     // 保留位
     float q1;                 // 四元数
