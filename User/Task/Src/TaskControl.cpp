@@ -46,10 +46,14 @@ typedef struct
     float kd;
 } pid_tuning_t;
 
-pid_tuning_t yaw_pos_tuning = {100.0f, 2200.0f};
-pid_tuning_t yaw_spd_tuning = {6000.0f, 0.0f};
-pid_tuning_t pitch_pos_tuning = {120.0f, 1000.0f};
-pid_tuning_t pitch_spd_tuning = {300.0f, 0.0f};
+// pid_tuning_t yaw_pos_tuning = {100.0f, 2200.0f};
+// pid_tuning_t yaw_spd_tuning = {6000.0f, 0.0f};
+// pid_tuning_t pitch_pos_tuning = {120.0f, 1000.0f};
+// pid_tuning_t pitch_spd_tuning = {300.0f, 0.0f};
+pid_tuning_t yaw_pos_tuning = {80.0f, 1800.0f};
+pid_tuning_t yaw_spd_tuning = {4000.0f, 0.0f};
+pid_tuning_t pitch_pos_tuning = {80.0f, 800.0f};
+pid_tuning_t pitch_spd_tuning = {200.0f, 0.0f};
 
 float pitch_comp_tuning=1.0f;
 float yaw_comp_tuning=1.0f;

@@ -28,7 +28,6 @@ extern TX_SEMAPHORE IMUThreadSem;
 
     SLOPE raw_kbd_vx_updater(0.0f, 0.002f);
     SLOPE raw_kbd_vy_updater(0.0f, 0.002f);
-    SLOPE raw_kbd_dlen_updater(0.15f, 0.001f);
 
     om_topic_t *cmd_topic = om_config_topic(nullptr, "ca", "cmd", sizeof(msg_cmd_t));
     msg_cmd_t cmd{};
@@ -52,6 +51,7 @@ extern TX_SEMAPHORE IMUThreadSem;
     comm_cmd_t cmd_msg{};
 
     uint8_t ui_reset = 0;
+    int8_t len_level = 0;
 
     Filter::KalmanFilter_1D manual_yaw_filter;
     Filter::KalmanFilter_1D manual_pitch_filter;
@@ -93,11 +93,26 @@ extern TX_SEMAPHORE IMUThreadSem;
 
         float raw_kbd_vx = (remoter.key.W ? 1.0f : 0.0f)-(remoter.key.S ? 1.0f : 0.0f);
         float raw_kbd_vy = (remoter.key.D ? 1.0f : 0.0f)-(remoter.key.A ? 1.0f : 0.0f);
-        float raw_kbd_dlen = (remoter.key.E ? 1.0f : 0.0f) - (remoter.key.Q ? 1.0f : 0.0f);
+        
+        if (!cmd.ifmove)
+        {
+            len_level = 0;
+        }
+        else
+        {
+            if (!remoter.last_key.Q && remoter.key.Q)
+                len_level--;
+            if (!remoter.last_key.E && remoter.key.E)
+                len_level++;
+            if (len_level < 0)
+                len_level = 0;
+            else if (len_level > 2)
+                len_level = 2;
+        }
 
         cmd_msg.vx = static_cast<int8_t>((raw_kbd_vx_updater.UpdateVal(raw_kbd_vx)+remoter.left_y)*10);
         cmd_msg.vy = static_cast<int8_t>((raw_kbd_vy_updater.UpdateVal(raw_kbd_vy)+remoter.left_x)*10);
-        cmd_msg.dlen = static_cast<int8_t>((raw_kbd_dlen_updater.UpdateVal(raw_kbd_dlen))*10);
+        cmd_msg.len_level = len_level;
         cmd.dpitch = manual_pitch_filter.Update(remoter.mouse_y*0.01f) + remoter.right_y;
         cmd.dyaw = manual_yaw_filter.Update(remoter.mouse_x*0.025f) + remoter.right_x;
 
