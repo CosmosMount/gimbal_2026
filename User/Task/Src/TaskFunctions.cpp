@@ -140,11 +140,11 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd.ifspin = false;
 
-        // if (!remoter.last_key.C && remoter.key.C)
-        //     cmd.ifjump = true;
-        // else
-        //     cmd.ifjump = false;
-        cmd_msg.ifjump = false;
+        if (!remoter.last_key.C && remoter.key.C)
+            cmd_msg.ifjump = true;
+        else
+            cmd_msg.ifjump = false;
+        // cmd_msg.ifjump = false;
 
         if (!remoter.last_key.R && remoter.key.R)
             cmd.ifturn = true;
