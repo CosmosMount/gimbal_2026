@@ -36,6 +36,8 @@ struct msg_cmd_t
     bool shoot;
     bool fire;
     bool auto_aim;
+    bool ifreverse;
+    bool auto_shoot;
     shooter_type_e shooter_type;
 };
 

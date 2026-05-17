@@ -14,6 +14,7 @@
 #ifdef DEBUG
 msg_remoter_t debug_remoter;
 comm_chassis_t debug_comm;
+uint8_t debug_ui_reset;
 #endif
 
 TX_THREAD OperateThread;
@@ -40,8 +41,6 @@ extern TX_SEMAPHORE IMUThreadSem;
     msg_motor_t motor{};
     om_suber_t *vision_suber = om_subscribe(om_find_topic("visionrx", UINT32_MAX));
     msg_visionrx_t vision_rx{};
-    bool valid_vision_rx;
-    float prev_px = 0.0f, prev_py = 0.0f;
     uint16_t false_cnt;
 
     uint8_t UIMsg[8];
@@ -125,15 +124,24 @@ extern TX_SEMAPHORE IMUThreadSem;
 
         if ((remoter.shoot_sw == Warm && remoter.mouse_left)
              || remoter.shoot_sw == Fire)
+        {
             cmd.fire = true;
+            if (remoter.key.CTRL)
+            {
+                cmd.ifreverse = true;
+            }
+        }
         else
             cmd.fire = false;
 
         if (remoter.mouse_right)
+        {
             cmd.auto_aim = true;
+            if (remoter.key.CTRL)
+                cmd.auto_shoot = true;
+        } 
         else
             cmd.auto_aim = false;
-        cmd.auto_aim = true;
 
         if (remoter.key.SHIFT || remoter.ctrl_sw == Spin)
             cmd.ifspin = true;
@@ -144,7 +152,6 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd_msg.ifjump = true;
         else
             cmd_msg.ifjump = false;
-        // cmd_msg.ifjump = false;
 
         if (!remoter.last_key.R && remoter.key.R)
             cmd.ifturn = true;
@@ -161,7 +168,7 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd_msg.ifstair = false;
 
-        if (!remoter.last_key.B && remoter.key.B)
+        if (remoter.key.B)
             ui_reset = 1;
         else
             ui_reset = 0;
@@ -189,23 +196,7 @@ extern TX_SEMAPHORE IMUThreadSem;
         ui_msg.aim_rune = cmd.aim_rune ? 1 : 0;
         ui_msg.aim_target_now = vision_rx.id;
 
-        if (vision_rx.project_x == prev_px || vision_rx.project_y == prev_py)
-        {
-            if (false_cnt < 100)
-                false_cnt++;
-            else
-            {
-                false_cnt = 0;
-                valid_vision_rx = false;
-            }
-        }
-        else
-        {
-            false_cnt = 0;
-            valid_vision_rx = true;
-        }
-
-        if (!valid_vision_rx)
+        if (!vision_rx.tracking)
         {
             ui_msg.fire = 0;
             ui_msg.aim_target_now = 0;
@@ -213,11 +204,10 @@ extern TX_SEMAPHORE IMUThreadSem;
             ui_msg.aim_target_y = 0;
         }
 
+        debug_ui_reset = ui_reset;
+
         memcpy(&UIMsg, reinterpret_cast<uint8_t*>(&ui_msg), sizeof(comm_ui_t));
         CAN_Transmit(&hfdcan2, 0xB1, UIMsg, 8);
-
-        prev_px = vision_rx.project_x;
-        prev_py = vision_rx.project_y;
 
         om_publish(cmd_topic, &cmd, sizeof(msg_cmd_t), true, false);
         om_publish(comm_topic, &comm, sizeof(comm_chassis_t), true, false);

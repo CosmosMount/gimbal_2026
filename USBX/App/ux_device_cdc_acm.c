@@ -268,8 +268,8 @@ VOID usbx_cdc_acm_write_thread_entry(ULONG thread_input)
       Append_CRC16_Check_Sum((uint8_t *)&msg_visiontx, sizeof(msg_visiontx));      
       memcpy(&debug_visiontx, &msg_visiontx, sizeof(msg_visiontx));
       ux_device_class_cdc_acm_write(cdc_acm, (UCHAR *)&msg_visiontx , sizeof(msg_visiontx) , &actual_length);
-      tx_thread_sleep(2);
     }
+    tx_thread_sleep(2);
   }
 }
 /* USER CODE END 2 */

@@ -232,24 +232,21 @@ static float sin_signal(float t, float T, float amplitude)
         om_suber_export(comm_suber, &comm, false);
 
         if (Verify_CRC16_Check_Sum(reinterpret_cast<uint8_t*>(&vision_rx), sizeof(msg_visionrx_t))
-             && vision_rx.header == 0xA5)
+            && vision_rx.header == 0xA5)
         {
             if (isnan(vision_rx.yaw) || isnan(vision_rx.yaw_vel) || isnan(vision_rx.yaw_acc) ||
                 isnan(vision_rx.pitch) || isnan(vision_rx.pitch_vel) || isnan(vision_rx.pitch_acc))
             {
                 valid_vision_rx = false;
-                memcpy(&vision_rx, &prev_vision_rx, sizeof(msg_visionrx_t));
             }
             else
             {
                 valid_vision_rx = true;
-                memcpy(&prev_vision_rx, &vision_rx, sizeof(msg_visionrx_t));
             }
         }
         else 
         {
             valid_vision_rx = false;
-            memcpy(&vision_rx, &prev_vision_rx, sizeof(msg_visionrx_t));
         }
 
         if (!cmd.ifmove || tx_semaphore_get(&IMUThreadSem, TX_NO_WAIT) != TX_SUCCESS)
@@ -291,25 +288,7 @@ static float sin_signal(float t, float T, float amplitude)
                     delta_yaw = 0.0f;
                 }
 
-                if (tx_semaphore_get(&VisionRxSem, TX_NO_WAIT) != TX_SUCCESS)
-                {
-                    aim_lost_cnt++;
-                    if (aim_lost_cnt > 100)
-                    {
-                        gimbal_state = MANUALAIM;
-                        valid_vision_rx = false;
-                        memset(&vision_rx, 0, sizeof(msg_visionrx_t));
-                        memset(&prev_vision_rx, 0, sizeof(msg_visionrx_t));
-                        aim_lost_cnt = 0;
-                        break;
-                    }
-                }
-                else
-                {
-                    aim_lost_cnt = 0;
-                }
-
-                if (!cmd.auto_aim)
+                if (!cmd.auto_aim || !vision_rx.tracking)
                 {
                     gimbal_state = MANUALAIM;
                     break;
@@ -414,7 +393,7 @@ static float sin_signal(float t, float T, float amplitude)
                 motor.yaw_cur = Numeric::Int16Constrain(static_cast<int16_t>(-yaw_spd_pid.result), -25000, 25000);
                 pitch_motor.currentSet = static_cast<int16_t>(pitch_spd_pid.result*50.0f+3500*arm_cos_f32(ins.pitch*DegreeToRad)*0.5f);
 
-                if (valid_vision_rx && cmd.auto_aim)
+                if (valid_vision_rx && cmd.auto_aim && vision_rx.tracking)
                 {
                     gimbal_state = AUTOAIM;
                 }
@@ -442,18 +421,27 @@ static float sin_signal(float t, float T, float amplitude)
 
             case SHOOT:
             {
-                Lfric.speedSet = 660;
-                Rfric.speedSet = -660;
-                if (((yaw_pos_pid.ref-yaw_pos_pid.fdb)<0.01f 
-                    && (pitch_pos_pid.ref-pitch_pos_pid.fdb)<0.002f 
-                    && vision_rx.fire)
-                    || cmd.fire)
+                Lfric.speedSet = 600;
+                Rfric.speedSet = -600;
+                if (cmd.fire)
                 {
                     motor.tri_spd = 8;
-                    if (comm.heatnow >= comm.heatlimit*0.85f)
+                    if (comm.heatnow >= comm.heatlimit*0.70f)
                         motor.tri_spd = 0;
                     if (cmd.aim_rune)
                         motor.tri_spd = 6;
+                    if (cmd.ifreverse)
+                        motor.tri_spd = -8;
+                }
+                else if (cmd.auto_shoot)
+                {
+                    if ((yaw_pos_pid.ref-yaw_pos_pid.fdb)<0.01f 
+                    && (pitch_pos_pid.ref-pitch_pos_pid.fdb)<0.002f 
+                    && vision_rx.fire
+                    && cmd.auto_aim)
+                        motor.tri_spd = 8;
+                    if (comm.heatnow >= comm.heatlimit*0.70f)
+                        motor.tri_spd = 0;
                 }
                 else
                 {
