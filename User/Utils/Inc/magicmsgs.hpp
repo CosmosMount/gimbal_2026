@@ -6,20 +6,21 @@ extern "C" {
 
 typedef enum 
 {
-    Relax = 2,
-    Spin = 1,
-    Normal = 3,
-    R2N = 4,
-    N2R = 5,
-    N2S = 6,
-    S2N = 7
-}CTRL_STATE;
+    Relax  = 0,
+    Normal   = 1,
+    Spin = 2,
+    R2N = 3,
+    N2R = 4,
+    N2S = 5,
+    S2N = 6
+} CTRL_STATE;
 
-typedef enum {
-    Closed = 2,
-    Warm = 3,
-    Fire = 1
-}SHOOT_STATE;
+typedef enum 
+{
+    Closed = 0,
+    Warm   = 1,
+    Fire   = 2
+} SHOOT_STATE;
 
 typedef enum {
     SPD,

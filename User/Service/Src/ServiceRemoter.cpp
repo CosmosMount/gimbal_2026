@@ -5,83 +5,247 @@
 
 TX_THREAD RemoterThread;
 uint8_t RemoterThreadStack[1024] = {0};
-TX_SEMAPHORE RemoterGot;
 
-// 数组在 D1 RAM
+TX_SEMAPHORE RemoterGot;
+TX_SEMAPHORE RemoterGotVT;
+
+vt03_data_t debug_vt03;
+
+// DMA buffer
 __attribute__((section(".RAM_D1"))) uint8_t dr16_rx[DR16_DATA_SIZE];
 __attribute__((section(".RAM_D1"))) uint8_t vt03_rx[VT03_DATA_SIZE];
 
-inline dr16_data_t& Dr16_Data()
+/* ---------- 参数 ---------- */
+static constexpr int LOST_THRESHOLD = 100;
+static constexpr float SMOOTH_ALPHA = 0.2f;
+
+/* ---------- 状态 ---------- */
+enum class RemoterType
 {
-    return *reinterpret_cast<dr16_data_t*>(dr16_rx);
+    NONE,
+    DR16,
+    VT03
+};
+
+struct RemoterState
+{
+    RemoterType current = RemoterType::NONE;
+    uint32_t dr16_lost = 0;
+    uint32_t vt03_lost = 0;
+};
+
+/* ---------- 工具 ---------- */
+
+inline bool update_online(bool got, uint32_t& lost_cnt)
+{
+    if (got)
+    {
+        lost_cnt = 0;
+        return true;
+    }
+    else
+    {
+        lost_cnt++;
+        return lost_cnt < LOST_THRESHOLD;
+    }
 }
 
-inline vt03_data_t& Vt03_Data()
+inline CTRL_STATE process_ctrl(CTRL_STATE last, CTRL_STATE now)
 {
-    return *reinterpret_cast<vt03_data_t*>(vt03_rx);
+    if (last == CTRL_STATE::Relax && now == CTRL_STATE::Normal)
+        return CTRL_STATE::R2N;
+    else if (last == CTRL_STATE::Normal && now == CTRL_STATE::Relax)
+        return CTRL_STATE::N2R;
+    else if (last == CTRL_STATE::Normal && now == CTRL_STATE::Spin)
+        return CTRL_STATE::N2S;
+    else if (last == CTRL_STATE::Spin && now == CTRL_STATE::Normal)
+        return CTRL_STATE::S2N;
+
+    return now;
 }
 
-[[noreturn]] void RemoterThreadFun(ULONG initial_input) 
+/* ---------- 数据填充 ---------- */
+
+void fill_dr16(msg_remoter_t& raw, dr16_data_t& data)
+{
+    raw.ctrl_sw  = static_cast<CTRL_STATE>((data.s2+1)%3);
+    raw.shoot_sw = static_cast<SHOOT_STATE>((data.s1+1)%3);
+
+    raw.right_x = (static_cast<float>(data.ch_0) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+    raw.right_y = (static_cast<float>(data.ch_1) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+    raw.left_x  = (static_cast<float>(data.ch_2) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+    raw.left_y  = (static_cast<float>(data.ch_3) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+
+    raw.mouse_x = static_cast<float>(data.mouse_x);
+    raw.mouse_y = static_cast<float>(data.mouse_y);
+    raw.mouse_z = static_cast<float>(data.mouse_z);
+
+    raw.mouse_left  = data.mouse_left != 0;
+    raw.mouse_right = data.mouse_right != 0;
+
+    memcpy(&raw.key, &data.key, sizeof(raw.key));
+}
+
+void fill_vt03(msg_remoter_t& raw, vt03_data_t& now, vt03_data_t& last, SHOOT_STATE last_shoot_sw)
+{
+    raw.ctrl_sw = static_cast<CTRL_STATE>(now.mode_sw);
+
+    raw.right_x = (static_cast<float>(now.ch_0) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+    raw.right_y = (static_cast<float>(now.ch_1) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+    raw.left_x  = (static_cast<float>(now.ch_3) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+    raw.left_y  = (static_cast<float>(now.ch_2) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+
+    raw.mouse_x = static_cast<float>(now.mouse_x);
+    raw.mouse_y = static_cast<float>(now.mouse_y);
+    raw.mouse_z = static_cast<float>(now.mouse_z);
+
+    raw.mouse_left  = now.mouse_left != 0;
+    raw.mouse_right = now.mouse_right != 0;
+
+    memcpy(&raw.key, &now.key, sizeof(raw.key));
+
+    bool fn1_pressed = (now.fn_1 != 0) && (last.fn_1 == 0);
+    bool fn2_pressed = (now.fn_2 != 0) && (last.fn_2 == 0);
+
+    if (fn1_pressed)
+    {
+        raw.shoot_sw = SHOOT_STATE::Closed;
+    }
+    else if (fn2_pressed)
+    {
+        switch (last_shoot_sw)
+        {
+        case SHOOT_STATE::Closed:
+            raw.shoot_sw = SHOOT_STATE::Warm;
+            break;
+        case SHOOT_STATE::Warm:
+            raw.shoot_sw = SHOOT_STATE::Fire;
+            break;
+        case SHOOT_STATE::Fire:
+            raw.shoot_sw = SHOOT_STATE::Closed;
+            break;
+        }
+    }
+    else
+    {
+        raw.shoot_sw = last_shoot_sw;
+    }
+}
+
+/* ---------- 主线程 ---------- */
+
+[[noreturn]] void RemoterThreadFun(ULONG initial_input)
 {
     UNUSED(initial_input);
 
-    /* Remoter Topic */
-    om_topic_t *remoter_topic = om_config_topic(nullptr, "ca", "remoter", sizeof(msg_remoter_t));
-    msg_remoter_t msg_remoter{};
-    msg_remoter.offline = true;
+    om_topic_t *remoter_topic =
+        om_config_topic(nullptr, "ca", "remoter", sizeof(msg_remoter_t));
 
-    for (;;) 
+    msg_remoter_t output{};
+    msg_remoter_t dr16_raw{}, vt03_raw{};
+
+    dr16_data_t dr16_data{};
+    vt03_data_t vt03_data{}, last_vt03_data{};
+
+    RemoterState state;
+
+    output.offline = true;
+
+    for (;;)
     {
-        while (tx_semaphore_get(&RemoterGot, 100) != TX_SUCCESS) 
+        bool dr16_got = (tx_semaphore_get(&RemoterGot, 0) == TX_SUCCESS);
+        bool vt03_got = (tx_semaphore_get(&RemoterGotVT, 0) == TX_SUCCESS);
+
+        bool dr16_online = update_online(dr16_got, state.dr16_lost);
+        bool vt03_online = update_online(vt03_got, state.vt03_lost);
+        
+        dr16_data = *reinterpret_cast<dr16_data_t*>(dr16_rx);
+        vt03_data = *reinterpret_cast<vt03_data_t*>(vt03_rx);
+
+        debug_vt03 = vt03_data;
+
+        // 收到才更新
+        if (dr16_got) 
         {
-            msg_remoter.offline = true;
-            HAL_UART_Abort(&huart5);
-            om_publish(remoter_topic, &msg_remoter, sizeof(msg_remoter), true, false);
-            tx_thread_sleep(3);
-            HAL_UARTEx_ReceiveToIdle_DMA(&huart5, dr16_rx, DR16_DATA_SIZE);
+            fill_dr16(dr16_raw, dr16_data);
+        }
+        if (vt03_got) 
+        {
+            fill_vt03(vt03_raw, vt03_data, last_vt03_data, output.last_shoot_sw);
+            last_vt03_data = vt03_data;
         }
 
-        msg_remoter.offline = false;
-        // 开关
-        msg_remoter.ctrl_sw  = static_cast<CTRL_STATE>(Dr16_Data().s2);
-        msg_remoter.shoot_sw = static_cast<SHOOT_STATE>(Dr16_Data().s1);
+        // -------- 选择 --------
+        RemoterType target = RemoterType::NONE;
 
-        if (msg_remoter.last_ctrl_sw == CTRL_STATE::Relax && msg_remoter.ctrl_sw == CTRL_STATE::Normal) 
+        if (dr16_online)
+            target = RemoterType::DR16;
+        else if (vt03_online)
+            target = RemoterType::VT03;
+
+        // -------- 切换 --------
+        if (target != state.current)
         {
-            msg_remoter.ctrl_sw = CTRL_STATE::R2N;
+            if (target == RemoterType::DR16)
+                output = dr16_raw;
+            else if (target == RemoterType::VT03)
+                output = vt03_raw;
+
+            state.current = target;
         }
-        else if (msg_remoter.last_ctrl_sw == CTRL_STATE::Normal && msg_remoter.ctrl_sw == CTRL_STATE::Relax) 
+        else
         {
-            msg_remoter.ctrl_sw = CTRL_STATE::N2R;
-        }
-        else if (msg_remoter.last_ctrl_sw == CTRL_STATE::Normal && msg_remoter.ctrl_sw == CTRL_STATE::Spin) 
-        {
-            msg_remoter.ctrl_sw = CTRL_STATE::N2S;
-        }
-        else if (msg_remoter.last_ctrl_sw == CTRL_STATE::Spin && msg_remoter.ctrl_sw == CTRL_STATE::Normal) 
-        {
-            msg_remoter.ctrl_sw = CTRL_STATE::S2N;
+            if (state.current == RemoterType::DR16)
+            {
+                output.ctrl_sw = process_ctrl(output.last_ctrl_sw, dr16_raw.ctrl_sw);
+                output.shoot_sw = dr16_raw.shoot_sw;
+
+                output.right_x = dr16_raw.right_x;
+                output.right_y = dr16_raw.right_y;
+                output.left_x  = dr16_raw.left_x;
+                output.left_y  = dr16_raw.left_y;
+
+                output.mouse_x = dr16_raw.mouse_x;
+                output.mouse_y = dr16_raw.mouse_y;
+                output.mouse_z = dr16_raw.mouse_z;
+
+                output.mouse_left  = dr16_raw.mouse_left;
+                output.mouse_right = dr16_raw.mouse_right;
+
+                memcpy(&output.key, &dr16_raw.key, sizeof(output.key));
+            }
+            else if (state.current == RemoterType::VT03)
+            {
+                output.ctrl_sw = process_ctrl(output.last_ctrl_sw, vt03_raw.ctrl_sw);
+                output.shoot_sw = vt03_raw.shoot_sw;
+
+                output.right_x = vt03_raw.right_x;
+                output.right_y = vt03_raw.right_y;
+                output.left_x  = vt03_raw.left_x;
+                output.left_y  = vt03_raw.left_y;
+
+                output.mouse_x = vt03_raw.mouse_x;
+                output.mouse_y = vt03_raw.mouse_y;
+                output.mouse_z = vt03_raw.mouse_z;
+
+                output.mouse_left  = vt03_raw.mouse_left;
+                output.mouse_right = vt03_raw.mouse_right;
+
+                memcpy(&output.key, &vt03_raw.key, sizeof(output.key));
+            }
         }
 
-        // 摇杆 11 位 -> float [-1,1]
-        msg_remoter.right_x  = (static_cast<float>(Dr16_Data().ch_0) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
-        msg_remoter.right_y  = (static_cast<float>(Dr16_Data().ch_1) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
-        msg_remoter.left_x = (static_cast<float>(Dr16_Data().ch_2) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
-        msg_remoter.left_y = (static_cast<float>(Dr16_Data().ch_3) - RC_CH_VALUE_OFFSET) / RC_CH_OFFSET_MAX;
+        // -------- 状态 --------
+        output.offline = (state.current == RemoterType::NONE);
 
-        // 鼠标
-        msg_remoter.mouse_x  = static_cast<float>(Dr16_Data().mouse_x);
-        msg_remoter.mouse_y  = static_cast<float>(Dr16_Data().mouse_y);
-        msg_remoter.mouse_z  = static_cast<float>(Dr16_Data().mouse_z);
-        msg_remoter.mouse_left  = Dr16_Data().mouse_left != 0;
-        msg_remoter.mouse_right = Dr16_Data().mouse_right != 0;
+        // -------- 发布 --------
+        om_publish(remoter_topic, &output, sizeof(output), true, false);
 
-        // 键盘位域可以直接 memcpy
-        memcpy(&msg_remoter.key, &Dr16_Data().key, sizeof(msg_remoter.key));
-        om_publish(remoter_topic, &msg_remoter, sizeof(msg_remoter), true, false);
-        msg_remoter.last_ctrl_sw = msg_remoter.ctrl_sw;
-        msg_remoter.last_shoot_sw = msg_remoter.shoot_sw;
-        memcpy(&msg_remoter.last_key, &msg_remoter.key, sizeof(msg_remoter.key));
+        // -------- 记录 --------
+        output.last_ctrl_sw = output.ctrl_sw;
+        output.last_shoot_sw = output.shoot_sw;
+        memcpy(&output.last_key, &output.key, sizeof(output.key));
+
         tx_thread_sleep(1);
     }
 }

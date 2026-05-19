@@ -18,7 +18,9 @@ extern DMA_HandleTypeDef hdma_usart1_tx;
 __attribute__((section (".RAM_D1"))) uint8_t UART7RxBuffer[256] = {0};
 __attribute__((section (".RAM_D1"))) uint8_t USART1RxBuffer[256] = {0};
 extern uint8_t dr16_rx[DR16_DATA_SIZE];
+extern uint8_t vt03_rx[VT03_DATA_SIZE];
 extern TX_SEMAPHORE RemoterGot;
+extern TX_SEMAPHORE RemoterGotVT;
 
 /**
  * @brief  Configures the USART.
@@ -33,7 +35,8 @@ void USART_Init()
   __HAL_DMA_ENABLE_IT(&hdma_usart1_rx, DMA_IT_TC);
   __HAL_DMA_DISABLE_IT(&hdma_usart1_tx, DMA_IT_HT);
   __HAL_DMA_ENABLE_IT(&hdma_usart1_tx, DMA_IT_TC);
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, USART1RxBuffer, 256);
+  __HAL_UART_SEND_REQ(&huart1, UART_RXDATA_FLUSH_REQUEST);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, vt03_rx, VT03_DATA_SIZE);
   // uart5
   __HAL_DMA_DISABLE_IT(&hdma_uart5_rx, DMA_IT_HT);
   __HAL_DMA_ENABLE_IT(&hdma_uart5_rx, DMA_IT_TC);
@@ -55,15 +58,31 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     SCB_InvalidateDCache_by_Addr((uint32_t*)dr16_rx, DR16_DATA_SIZE);
     tx_semaphore_put(&RemoterGot);
     HAL_UARTEx_ReceiveToIdle_DMA(&huart5, dr16_rx, DR16_DATA_SIZE);
-  } 
-  else if (huart == &huart7) 
-  {
-    // SCB_InvalidateDCache_by_Addr((uint32_t*)UART7RxBuffer, 256);
-    // HAL_UARTEx_ReceiveToIdle_DMA(&huart7, UART7RxBuffer, 256);
   }
   else if (huart == &huart1) 
   {
-    // SCB_InvalidateDCache_by_Addr((uint32_t*)USART1RxBuffer, 256);
-    // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, USART1RxBuffer, 256);
+    SCB_InvalidateDCache_by_Addr((uint32_t*)vt03_rx, VT03_DATA_SIZE);
+    tx_semaphore_put(&RemoterGotVT);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, vt03_rx, VT03_DATA_SIZE);
+  }
+  // else if (huart == &huart7) 
+  // {
+  //   // SCB_InvalidateDCache_by_Addr((uint32_t*)UART7RxBuffer, 256);
+  //   // HAL_UARTEx_ReceiveToIdle_DMA(&huart7, UART7RxBuffer, 256);
+  // }
+  
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART1)
+  {
+    __HAL_UART_CLEAR_OREFLAG(huart);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, vt03_rx, VT03_DATA_SIZE);
+  }
+  else if (huart->Instance == UART5)
+  {
+    __HAL_UART_CLEAR_OREFLAG(huart);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart5, dr16_rx, DR16_DATA_SIZE);
   }
 }

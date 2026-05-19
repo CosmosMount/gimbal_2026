@@ -8,6 +8,7 @@
 
 extern TX_THREAD RemoterThread;
 extern TX_SEMAPHORE RemoterGot;
+extern TX_SEMAPHORE RemoterGotVT;
 extern uint8_t RemoterThreadStack[1024];
 extern void RemoterThreadFun(ULONG initial_input);
 
@@ -59,7 +60,8 @@ extern "C" void ServiceBooster()
         2, 2, TX_NO_TIME_SLICE, TX_AUTO_START);
 
     tx_semaphore_create(&RemoterGot, TX_NAME("RemoterGot"), 0);
-
+    tx_semaphore_create(&RemoterGotVT, TX_NAME("RemoterGotVT"), 0);
+    
     tx_thread_create(&IMUThread, TX_NAME("IMUThread"),
         IMUThreadFun, 0x1234, IMUThreadStack, sizeof(IMUThreadStack),
         3, 3, TX_NO_TIME_SLICE, TX_AUTO_START);

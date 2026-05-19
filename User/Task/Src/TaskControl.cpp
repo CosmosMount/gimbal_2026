@@ -421,11 +421,11 @@ static float sin_signal(float t, float T, float amplitude)
 
             case SHOOT:
             {
-                Lfric.speedSet = 600;
-                Rfric.speedSet = -600;
+                Lfric.speedSet = 300;
+                Rfric.speedSet = -300;
                 if (cmd.fire)
                 {
-                    motor.tri_spd = 8;
+                    motor.tri_spd = 6;
                     if (comm.heatnow >= comm.heatlimit*0.70f)
                         motor.tri_spd = 0;
                     if (cmd.aim_rune)
