@@ -104,8 +104,8 @@ void fill_vt03(msg_remoter_t& raw, vt03_data_t& now, vt03_data_t& last, SHOOT_ST
 
     memcpy(&raw.key, &now.key, sizeof(raw.key));
 
-    bool fn1_pressed = (now.fn_1 != 0) && (last.fn_1 == 0);
-    bool fn2_pressed = (now.fn_2 != 0) && (last.fn_2 == 0);
+    bool fn1_pressed = (now.fn_1 == 1) && (last.fn_1 == 0);
+    bool fn2_pressed = (now.fn_2 == 1) && (last.fn_2 == 0);
 
     if (fn1_pressed)
     {
@@ -122,6 +122,9 @@ void fill_vt03(msg_remoter_t& raw, vt03_data_t& now, vt03_data_t& last, SHOOT_ST
             raw.shoot_sw = SHOOT_STATE::Fire;
             break;
         case SHOOT_STATE::Fire:
+            raw.shoot_sw = SHOOT_STATE::Closed;
+            break;
+        default:
             raw.shoot_sw = SHOOT_STATE::Closed;
             break;
         }
@@ -154,7 +157,7 @@ void fill_vt03(msg_remoter_t& raw, vt03_data_t& now, vt03_data_t& last, SHOOT_ST
     for (;;)
     {
         bool dr16_got = (tx_semaphore_get(&RemoterGot, 0) == TX_SUCCESS);
-        bool vt03_got = (tx_semaphore_get(&RemoterGotVT, 0) == TX_SUCCESS);
+        bool vt03_got = (tx_semaphore_get(&RemoterGotVT, 0) == TX_SUCCESS) && vt03_data.sof_1 == 0xA9 && vt03_data.sof_2 == 0x53;
 
         bool dr16_online = update_online(dr16_got, state.dr16_lost);
         bool vt03_online = update_online(vt03_got, state.vt03_lost);

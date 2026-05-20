@@ -16,6 +16,7 @@ struct comm_ui_t
 {
     uint8_t reset : 1;
     uint8_t fire : 1;
+    uint8_t bulletfreq : 1;
     uint8_t aim_rune : 1;
     uint8_t aim_target_now : 4;
     uint8_t aim_target_x;
@@ -30,6 +31,7 @@ struct comm_cmd_t
     uint8_t ifturn : 1;
     uint8_t ifstair : 1;
     uint8_t iffly : 1;
+    uint8_t ifgimbalonly : 1;
     int16_t yaw_cur;
     int8_t vx;
     int8_t vy;

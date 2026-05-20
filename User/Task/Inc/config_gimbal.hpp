@@ -20,10 +20,9 @@ typedef enum
 
 typedef enum
 {
-    NORMAL,
-    SINGLE,
-    BURST
-} shooter_type_e;
+    LOW,
+    HIGH
+} shooter_freq_e;
 
 struct msg_cmd_t
 {
@@ -38,7 +37,7 @@ struct msg_cmd_t
     bool auto_aim;
     bool ifreverse;
     bool auto_shoot;
-    shooter_type_e shooter_type;
+    shooter_freq_e bulletfreq;
 };
 
 struct msg_motor_t

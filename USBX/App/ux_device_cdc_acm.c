@@ -219,6 +219,7 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
     }
     om_publish(visionrx_topic, &msg_visionrx, sizeof(msg_visionrx), true, false);
     msg_visionrx.header = 0;
+    msg_visionrx.tracking = 0;
     tx_thread_sleep(2);
   }
 }

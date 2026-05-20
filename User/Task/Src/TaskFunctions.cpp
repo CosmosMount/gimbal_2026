@@ -114,8 +114,6 @@ extern TX_SEMAPHORE IMUThreadSem;
         cmd_msg.len_level = len_level;
         cmd.dpitch = manual_pitch_filter.Update(remoter.mouse_y*0.01f) + remoter.right_y;
         cmd.dyaw = manual_yaw_filter.Update(remoter.mouse_x*0.025f) + remoter.right_x;
-
-        cmd.shooter_type = NORMAL;
         
         if (remoter.shoot_sw == Warm || remoter.shoot_sw == Fire)
             cmd.shoot = true;
@@ -130,9 +128,16 @@ extern TX_SEMAPHORE IMUThreadSem;
             {
                 cmd.ifreverse = true;
             }
+            else
+            {
+                cmd.ifreverse = false;
+            }
         }
         else
+        {
             cmd.fire = false;
+            cmd.ifreverse = false;
+        }
 
         if (remoter.mouse_right)
         {
@@ -173,17 +178,32 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd_msg.ifstair = false;
 
+        if (!remoter.last_key.X && remoter.key.X)
+        {
+            if (cmd.bulletfreq == LOW)
+                cmd.bulletfreq = HIGH;
+            else
+                cmd.bulletfreq = LOW;
+        }
+
         if (remoter.key.B)
             ui_reset = 1;
         else
             ui_reset = 0;
-
+        
         if (!remoter.last_key.F && remoter.key.F)
         {
             if (cmd.aim_rune)
                 cmd.aim_rune = false;
             else
                 cmd.aim_rune = true;
+            if (remoter.key.CTRL)
+            {
+                if (!cmd_msg.ifgimbalonly)
+                    cmd_msg.ifgimbalonly = true;
+                else
+                    cmd_msg.ifgimbalonly = false;
+            }
         }
 
         cmd_msg.ifmove = cmd.ifmove;
@@ -196,6 +216,7 @@ extern TX_SEMAPHORE IMUThreadSem;
         CAN_Transmit(&hfdcan2, 0xB2, CmdMsg, 8);
 
         ui_msg.reset = ui_reset;
+        ui_msg.bulletfreq = cmd.bulletfreq && (!cmd.aim_rune);
         ui_msg.aim_target_x = static_cast<uint8_t>(vision_rx.project_x*100);
         ui_msg.aim_target_y = static_cast<uint8_t>(vision_rx.project_y*100);
         ui_msg.aim_rune = cmd.aim_rune;

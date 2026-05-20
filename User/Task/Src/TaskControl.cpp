@@ -317,17 +317,11 @@ static float sin_signal(float t, float T, float amplitude)
             case MANUALAIM:
             {
 
-                if (!inited)
+                if (!comm.inited)
                 {
                     yaw_pos_pid.ref  = ins.total_yaw * DegreeToRad;
                     pitch_pos_pid.ref = 0.0f;
-                    if (comm.inited)
-                    {
-                        if (fabs(ins.pitch) < 5.0f)
-                        {  
-                            inited = true;
-                        }
-                    }
+                    maintained_yaw = false;
                 }
                 else 
                 {
@@ -428,8 +422,8 @@ static float sin_signal(float t, float T, float amplitude)
                     motor.tri_spd = 8;
                     if (comm.heatnow >= comm.heatlimit*0.70f)
                         motor.tri_spd = 0;
-                    if (cmd.aim_rune)
-                        motor.tri_spd = 6;
+                    if (cmd.aim_rune || cmd.bulletfreq == LOW)
+                        motor.tri_spd = 4;
                     if (cmd.ifreverse)
                         motor.tri_spd = -8;
                 }
@@ -440,7 +434,13 @@ static float sin_signal(float t, float T, float amplitude)
                     && vision_rx.fire
                     && cmd.auto_aim
                     && vision_rx.tracking)
-                        motor.tri_spd = 8;
+                    {
+                        if (cmd.bulletfreq == LOW)
+                            motor.tri_spd = 4;
+                        else
+                            motor.tri_spd = 8;
+                    }
+                        
                     if (comm.heatnow >= comm.heatlimit*0.70f)
                         motor.tri_spd = 0;
                 }
