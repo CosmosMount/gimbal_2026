@@ -139,9 +139,14 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.auto_aim = true;
             if (remoter.key.CTRL)
                 cmd.auto_shoot = true;
+            else
+                cmd.auto_shoot = false;
         } 
         else
+        {   
             cmd.auto_aim = false;
+            cmd.auto_shoot = false;
+        }
 
         if (remoter.key.SHIFT || remoter.ctrl_sw == Spin)
             cmd.ifspin = true;
@@ -193,7 +198,7 @@ extern TX_SEMAPHORE IMUThreadSem;
         ui_msg.reset = ui_reset;
         ui_msg.aim_target_x = static_cast<uint8_t>(vision_rx.project_x*100);
         ui_msg.aim_target_y = static_cast<uint8_t>(vision_rx.project_y*100);
-        ui_msg.aim_rune = cmd.aim_rune ? 1 : 0;
+        ui_msg.aim_rune = cmd.aim_rune;
         ui_msg.aim_target_now = vision_rx.id;
 
         if (!vision_rx.tracking)
