@@ -36,7 +36,9 @@ struct msg_cmd_t
     bool fire;
     bool auto_aim;
     bool ifreverse;
+    bool ifgimbalonly;
     bool auto_shoot;
+    bool shootcheck;
     shooter_freq_e bulletfreq;
 };
 

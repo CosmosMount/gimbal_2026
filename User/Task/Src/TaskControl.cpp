@@ -317,7 +317,7 @@ static float sin_signal(float t, float T, float amplitude)
             case MANUALAIM:
             {
 
-                if (!comm.inited)
+                if (!comm.inited && !cmd.ifgimbalonly)
                 {
                     yaw_pos_pid.ref  = ins.total_yaw * DegreeToRad;
                     pitch_pos_pid.ref = 0.0f;
@@ -420,12 +420,12 @@ static float sin_signal(float t, float T, float amplitude)
                 if (cmd.fire)
                 {
                     motor.tri_spd = 8;
-                    if (comm.heatnow >= comm.heatlimit*0.70f)
-                        motor.tri_spd = 0;
                     if (cmd.aim_rune || cmd.bulletfreq == LOW)
                         motor.tri_spd = 4;
                     if (cmd.ifreverse)
                         motor.tri_spd = -8;
+                    if (comm.heatnow >= comm.heatlimit*0.70f)
+                        motor.tri_spd = 0;
                 }
                 else if (cmd.auto_shoot)
                 {
@@ -443,6 +443,10 @@ static float sin_signal(float t, float T, float amplitude)
                         
                     if (comm.heatnow >= comm.heatlimit*0.70f)
                         motor.tri_spd = 0;
+                }
+                else if (cmd.shootcheck)
+                {
+                    motor.tri_spd = 16;
                 }
                 else
                 {

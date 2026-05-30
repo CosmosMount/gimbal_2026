@@ -56,7 +56,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   if (huart == &huart5) 
   {
     SCB_InvalidateDCache_by_Addr((uint32_t*)dr16_rx, DR16_DATA_SIZE);
-    tx_semaphore_put(&RemoterGot);
+    if (Size == DR16_DATA_SIZE)
+      tx_semaphore_put(&RemoterGot);
     HAL_UARTEx_ReceiveToIdle_DMA(&huart5, dr16_rx, DR16_DATA_SIZE);
   }
   else if (huart == &huart1) 

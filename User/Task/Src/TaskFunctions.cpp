@@ -59,6 +59,8 @@ extern TX_SEMAPHORE IMUThreadSem;
     manual_yaw_filter.SetQ(0.1f);    
     manual_yaw_filter.SetR(0.543f);
 
+    cmd.bulletfreq = HIGH;
+
     for (;;)
     {
         om_suber_export(remoter_suber, &remoter, false);
@@ -120,8 +122,7 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd.shoot = false;
 
-        if ((remoter.shoot_sw == Warm && remoter.mouse_left)
-             || remoter.shoot_sw == Fire)
+        if (remoter.shoot_sw == Warm && remoter.mouse_left)
         {
             cmd.fire = true;
             if (remoter.key.CTRL)
@@ -139,6 +140,15 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.ifreverse = false;
         }
 
+        if (remoter.shoot_sw == Fire)
+        {
+            cmd.shootcheck = true;
+        }
+        else
+        {
+            cmd.shootcheck = false;
+        }
+
         if (remoter.mouse_right)
         {
             cmd.auto_aim = true;
@@ -153,8 +163,14 @@ extern TX_SEMAPHORE IMUThreadSem;
             cmd.auto_shoot = false;
         }
 
+        // cmd.auto_aim = true;
+        // cmd.auto_shoot = true;
+
         if (remoter.key.SHIFT || remoter.ctrl_sw == Spin)
+        {
+            len_level = 0;
             cmd.ifspin = true;
+        }
         else
             cmd.ifspin = false;
 
@@ -199,16 +215,19 @@ extern TX_SEMAPHORE IMUThreadSem;
                 cmd.aim_rune = true;
             if (remoter.key.CTRL)
             {
-                if (!cmd_msg.ifgimbalonly)
-                    cmd_msg.ifgimbalonly = true;
+                if (!cmd.ifgimbalonly)
+                    cmd.ifgimbalonly = true;
                 else
-                    cmd_msg.ifgimbalonly = false;
+                    cmd.ifgimbalonly = false;
             }
         }
+
+        // cmd_msg.ifgimbalonly = true;
 
         cmd_msg.ifmove = cmd.ifmove;
         cmd_msg.ifspin = cmd.ifspin;
         cmd_msg.ifturn = cmd.ifturn;
+        cmd_msg.ifgimbalonly = cmd.ifgimbalonly;
         cmd_msg.yaw_cur = motor.yaw_cur;
         cmd_msg.tri_spd = motor.tri_spd;
 
