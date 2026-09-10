@@ -103,6 +103,8 @@ void fill_vt03(msg_remoter_t& raw, vt03_data_t& now, vt03_data_t& last, SHOOT_ST
     raw.mouse_right = now.mouse_right != 0;
 
     memcpy(&raw.key, &now.key, sizeof(raw.key));
+    // Pause 与键盘 C 共用单次跳跃入口，保留按住状态供底盘检测上升沿。
+    raw.key.C = raw.key.C || now.pause;
 
     bool fn1_pressed = (now.fn_1 == 1) && (last.fn_1 == 0);
     bool fn2_pressed = (now.fn_2 == 1) && (last.fn_2 == 0);

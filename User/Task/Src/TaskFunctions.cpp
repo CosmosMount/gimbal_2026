@@ -174,7 +174,8 @@ extern TX_SEMAPHORE IMUThreadSem;
         else
             cmd.ifspin = false;
 
-        if (!remoter.last_key.C && remoter.key.C)
+        // 发送按键电平，由底盘消费上升沿，避免单周期脉冲被通信漏采。
+        if (remoter.key.C)
             cmd_msg.ifjump = true;
         else
             cmd_msg.ifjump = false;
