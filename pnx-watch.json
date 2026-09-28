@@ -1,0 +1,48 @@
+{
+  "format": "pnx-watch",
+  "version": 1,
+  "groups": [
+    {
+      "id": "default",
+      "name": "默认组"
+    }
+  ],
+  "plots": [
+    {
+      "id": "plot-1",
+      "name": "曲线 1",
+      "groupId": "default",
+      "seconds": 10
+    },
+    {
+      "id": "plot-2",
+      "name": "曲线 2",
+      "groupId": "default",
+      "seconds": 10
+    },
+    {
+      "id": "plot-3",
+      "name": "曲线 3",
+      "groupId": "default",
+      "seconds": 10
+    }
+  ],
+  "variables": [
+    {
+      "expression": "debug_motor.lfric_spd",
+      "plotId": "plot-1"
+    },
+    {
+      "expression": "debug_motor.rfric_spd",
+      "plotId": "plot-2"
+    },
+    {
+      "expression": "debug_motor.ufric_spd",
+      "plotId": "plot-3"
+    }
+  ],
+  "activeGroup": "default",
+  "columns": 3,
+  "seconds": 10,
+  "rate": 1000
+}

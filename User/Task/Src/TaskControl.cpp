@@ -37,6 +37,8 @@ typedef struct
     float lfric_cur;
     float rfric_spd;
     float rfric_cur;
+    float ufric_spd;
+    float ufric_cur;
     int16_t yaw_cur;
 } debug_motor_t;
 debug_motor_t debug_motor;
@@ -140,8 +142,9 @@ static float sin_signal(float t, float T, float amplitude)
     UNUSED(initial_input);
 
     GM6020 pitch_motor;
-    M3508 Lfric;
-    M3508 Rfric;
+    M2006 Lfric;
+    M2006 Rfric;
+    M2006 Ufric;
 
     Lfric.controlMode = DJIMotor::SPD_MODE;
     Lfric.gearBox = GearBox_None;
@@ -149,10 +152,14 @@ static float sin_signal(float t, float T, float amplitude)
     Rfric.controlMode = DJIMotor::SPD_MODE;
     Rfric.gearBox = GearBox_None;
     Rfric.speedPid.kp = 100.0f;
+    Ufric.controlMode = DJIMotor::SPD_MODE;
+    Ufric.gearBox = GearBox_None;
+    Ufric.speedPid.kp = 100.0f;
 
     DJIMotorHandler::Instance()->registerMotor(&pitch_motor, &hfdcan1, 0x205);
     DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x201);
-    DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x202);
+    DJIMotorHandler::Instance()->registerMotor(&Ufric, &hfdcan1, 0x202);
+    DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x203);
 
     PID yaw_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 10.0f, PID_POSITION | PID_Derivative_On_Measurement);
     PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 25000.0f, 100.0f, PID_POSITION);
@@ -407,6 +414,7 @@ static float sin_signal(float t, float T, float amplitude)
             {
                 Lfric.currentSet = 0;
                 Rfric.currentSet = 0;
+                Ufric.currentSet = 0;
                 motor.tri_spd = 0;
                 if (cmd.shoot)
                     shooter_state = SHOOT;
@@ -415,8 +423,9 @@ static float sin_signal(float t, float T, float amplitude)
 
             case SHOOT:
             {
-                Lfric.speedSet = 600;
-                Rfric.speedSet = -600;
+                Lfric.speedSet = -1000;
+                Ufric.speedSet = -1000;
+                Rfric.speedSet = 1000;
                 if (cmd.fire)
                 {
                     motor.tri_spd = 8;
@@ -446,7 +455,7 @@ static float sin_signal(float t, float T, float amplitude)
                 }
                 else if (cmd.shootcheck)
                 {
-                    motor.tri_spd = 16;
+                    motor.tri_spd = 6;
                 }
                 else
                 {
@@ -454,6 +463,7 @@ static float sin_signal(float t, float T, float amplitude)
                 }
 
                 Lfric.setOutput();
+                Ufric.setOutput();
                 Rfric.setOutput();
                 break;
             }
@@ -469,6 +479,8 @@ static float sin_signal(float t, float T, float amplitude)
         debug_motor.lfric_cur = Lfric.motorFeedback.currentFdb;
         debug_motor.rfric_spd = Rfric.motorFeedback.speedFdb;
         debug_motor.rfric_cur = Rfric.motorFeedback.currentFdb;
+        debug_motor.ufric_spd = Ufric.motorFeedback.speedFdb;
+        debug_motor.ufric_cur = Ufric.motorFeedback.currentFdb;
         yaw_pos_pid.kp = yaw_pos_tuning.kp;
         yaw_pos_pid.kd = yaw_pos_tuning.kd;
         yaw_spd_pid.kp = yaw_spd_tuning.kp;

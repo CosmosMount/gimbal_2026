@@ -18,6 +18,7 @@ __attribute__((section(".RAM_D1"))) uint8_t vt03_rx[VT03_DATA_SIZE];
 /* ---------- 参数 ---------- */
 static constexpr int LOST_THRESHOLD = 100;
 static constexpr float SMOOTH_ALPHA = 0.2f;
+static constexpr uint16_t WHEEL_DEADZONE = 200;
 
 /* ---------- 状态 ---------- */
 enum class RemoterType
@@ -105,6 +106,9 @@ void fill_vt03(msg_remoter_t& raw, vt03_data_t& now, vt03_data_t& last, SHOOT_ST
     memcpy(&raw.key, &now.key, sizeof(raw.key));
     // Pause 与键盘 C 共用单次跳跃入口，保留按住状态供底盘检测上升沿。
     raw.key.C = raw.key.C || now.pause;
+    // 左侧回中拨轮与 Q/E 共用腿长档位入口；回中后再次拨动才产生新的上升沿。
+    raw.key.Q = raw.key.Q || now.wheel < RC_CH_VALUE_OFFSET - WHEEL_DEADZONE;
+    raw.key.E = raw.key.E || now.wheel > RC_CH_VALUE_OFFSET + WHEEL_DEADZONE;
 
     bool fn1_pressed = (now.fn_1 == 1) && (last.fn_1 == 0);
     bool fn2_pressed = (now.fn_2 == 1) && (last.fn_2 == 0);

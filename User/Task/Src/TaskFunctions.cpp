@@ -223,7 +223,7 @@ extern TX_SEMAPHORE IMUThreadSem;
             }
         }
 
-        // cmd_msg.ifgimbalonly = true;
+        cmd_msg.ifgimbalonly = true;
 
         cmd_msg.ifmove = cmd.ifmove;
         cmd_msg.ifspin = cmd.ifspin;

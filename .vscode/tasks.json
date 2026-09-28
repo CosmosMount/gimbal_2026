@@ -6,8 +6,8 @@
       "type": "shell",
       "command": "openocd",
       "args": [
-        // "-f", "interface/cmsis-dap.cfg",
-        "-f", "interface/stlink.cfg",
+        "-f", "interface/cmsis-dap.cfg",
+        // "-f", "interface/stlink.cfg",
         "-f", "target/stm32h7x.cfg",
         "-c", "program build/Debug/wbr_gimbal.elf reset exit",
       ]
