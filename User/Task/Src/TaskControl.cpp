@@ -145,6 +145,7 @@ static float sin_signal(float t, float T, float amplitude)
     M2006 Lfric;
     M2006 Rfric;
     M2006 Ufric;
+    M2006 trigger_motor;
 
     Lfric.controlMode = DJIMotor::SPD_MODE;
     Lfric.gearBox = GearBox_None;
@@ -155,11 +156,15 @@ static float sin_signal(float t, float T, float amplitude)
     Ufric.controlMode = DJIMotor::SPD_MODE;
     Ufric.gearBox = GearBox_None;
     Ufric.speedPid.kp = 100.0f;
+    trigger_motor.controlMode = DJIMotor::SPD_MODE;
+    trigger_motor.gearBox = GearBox_None; // 使用速度×36，其实精度更高
+    trigger_motor.speedPid.kp = 100.0f;
 
-    DJIMotorHandler::Instance()->registerMotor(&pitch_motor, &hfdcan1, 0x205);
+    // DJIMotorHandler::Instance()->registerMotor(&pitch_motor, &hfdcan1, 0x205);
     DJIMotorHandler::Instance()->registerMotor(&Lfric, &hfdcan1, 0x201);
     DJIMotorHandler::Instance()->registerMotor(&Ufric, &hfdcan1, 0x202);
     DJIMotorHandler::Instance()->registerMotor(&Rfric, &hfdcan1, 0x203);
+    DJIMotorHandler::Instance()->registerMotor(&trigger_motor, &hfdcan1, 0x204);
 
     PID yaw_pos_pid(200.0f, 0.0f, 0.0f, 500.0f, 10.0f, PID_POSITION | PID_Derivative_On_Measurement);
     PID yaw_spd_pid(40.0f, 0.0f, 1800.0f, 25000.0f, 100.0f, PID_POSITION);
@@ -415,7 +420,8 @@ static float sin_signal(float t, float T, float amplitude)
                 Lfric.currentSet = 0;
                 Rfric.currentSet = 0;
                 Ufric.currentSet = 0;
-                motor.tri_spd = 0;
+                trigger_motor.speedSet = 0;
+                // motor.tri_spd = 0;
                 if (cmd.shoot)
                     shooter_state = SHOOT;
                 break;
@@ -461,10 +467,12 @@ static float sin_signal(float t, float T, float amplitude)
                 {
                     motor.tri_spd = 0;
                 }
+                trigger_motor.speedSet = motor.tri_spd*36;
 
                 Lfric.setOutput();
                 Ufric.setOutput();
                 Rfric.setOutput();
+                trigger_motor.setOutput();
                 break;
             }
         }
